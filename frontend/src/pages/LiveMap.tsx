@@ -6,10 +6,10 @@ import type { Spill, VesselSummary } from '../types';
 
 // Custom vessel icon
 const vesselIcon = new L.DivIcon({
-  html: `<div class="w-3 h-3 bg-ocean rounded-full border border-ocean-light shadow-[0_0_10px_#06b6d4]"></div>`,
+  html: `<div style="width: 10px; height: 10px; background-color: #00F0FF; border-radius: 50%; border: 1px solid #030C14;"></div>`,
   className: 'bg-transparent',
-  iconSize: [12, 12],
-  iconAnchor: [6, 6]
+  iconSize: [10, 10],
+  iconAnchor: [5, 5]
 });
 
 export default function LiveMap() {
@@ -26,11 +26,21 @@ export default function LiveMap() {
   );
 
   return (
-    <div className="h-[calc(100vh-8rem)] rounded-xl overflow-hidden border border-line shadow-lg relative z-0">
+    <div className="h-[calc(100vh-8rem)] border border-line relative z-0 instrument-panel">
+      <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-amber -translate-x-[1px] -translate-y-[1px] z-50" />
+      <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-amber translate-x-[1px] -translate-y-[1px] z-50" />
+      <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-amber -translate-x-[1px] translate-y-[1px] z-50" />
+      <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-amber translate-x-[1px] translate-y-[1px] z-50" />
       <MapContainer center={[14.5, 75.1]} zoom={6} className="h-full w-full">
         <LayersControl position="topright">
-          <LayersControl.BaseLayer checked name="Dark Matter">
-            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <LayersControl.BaseLayer checked name="Dark Canvas (Cities)">
+            <LayerGroup>
+              <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}" />
+              <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}" />
+            </LayerGroup>
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Ocean Bathymetry">
+            <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}" />
           </LayersControl.BaseLayer>
           <LayersControl.BaseLayer name="Satellite">
             <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
@@ -43,13 +53,13 @@ export default function LiveMap() {
                   {spill.polygon_coords && spill.polygon_coords.length > 0 && (
                     <Polygon
                       positions={spill.polygon_coords as [number, number][]}
-                      pathOptions={{ color: '#f59e0b', fillColor: '#f97316', fillOpacity: 0.4, weight: 2 }}
+                      pathOptions={{ color: spill.severity === 'critical' ? '#C4432B' : '#D9A441', fillColor: spill.severity === 'critical' ? '#C4432B' : '#D9A441', fillOpacity: 0.2, weight: 1 }}
                     />
                   )}
                   <CircleMarker 
                     center={[spill.center_lat, spill.center_lon]} 
-                    radius={8}
-                    pathOptions={{ color: '#f97316', fillColor: '#f59e0b', fillOpacity: 0.8, weight: 2 }}
+                    radius={4}
+                    pathOptions={{ color: spill.severity === 'critical' ? '#C4432B' : '#D9A441', fillColor: spill.severity === 'critical' ? '#C4432B' : '#D9A441', fillOpacity: 1, weight: 1 }}
                   >
                     <Popup className="custom-popup">
                       <div className="p-1">

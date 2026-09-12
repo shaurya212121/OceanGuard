@@ -59,7 +59,7 @@ export default function Vessels() {
                       ? `${v.last_known_position.lat.toFixed(4)}, ${v.last_known_position.lon.toFixed(4)}`
                       : 'N/A'}
                   </td>
-                  <td className="p-4 text-sm text-text-muted">
+                  <td className="p-4 text-sm text-text-muted font-mono">
                     {v.last_known_position?.timestamp
                       ? new Date(v.last_known_position.timestamp).toLocaleString()
                       : 'N/A'}

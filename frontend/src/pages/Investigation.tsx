@@ -56,19 +56,20 @@ export default function Investigation() {
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-5 gap-6 min-h-[600px]">
         <GlassCard className="lg:col-span-3 flex flex-col relative z-0">
           <div className="p-3 border-b border-line flex gap-4 text-sm bg-navy-800">
-            <span className="flex items-center gap-2"><Crosshair size={14} className="text-danger"/> Origin Point</span>
-            <span className="flex items-center gap-2"><Wind size={14} className="text-ocean"/> Drift Path</span>
+            <span className="flex items-center gap-2"><Crosshair size={14} className="text-ocean"/> Origin Point</span>
+            <span className="flex items-center gap-2"><Wind size={14} className="text-teal"/> Drift Path</span>
           </div>
           <div className="flex-1 bg-navy-950">
             <MapContainer center={[spill.center_lat, spill.center_lon]} zoom={9} className="h-full w-full">
-              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}" />
+              <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}" />
               {spill.polygon_coords && spill.polygon_coords.length > 0 && (
-                <Polygon positions={spill.polygon_coords as [number, number][]} pathOptions={{ color: '#f59e0b', fillColor: '#f97316', fillOpacity: 0.3, weight: 2 }} />
+                <Polygon positions={spill.polygon_coords as [number, number][]} pathOptions={{ color: spill.severity === 'critical' ? '#FF2A5F' : '#00F0FF', fillColor: spill.severity === 'critical' ? '#FF2A5F' : '#00F0FF', fillOpacity: 0.15, weight: 1 }} />
               )}
-              <Polyline positions={backwardPath} pathOptions={{ color: '#ef4444', dashArray: '5, 10', weight: 2 }} />
-              <Polyline positions={forwardPath} pathOptions={{ color: '#06b6d4', weight: 2 }} />
-              <CircleMarker center={[drift.origin_estimate.lat, drift.origin_estimate.lon]} radius={6} pathOptions={{ color: '#ef4444', fillColor: '#ef4444', fillOpacity: 1, weight: 2 }} />
-              <CircleMarker center={[spill.center_lat, spill.center_lon]} radius={6} pathOptions={{ color: '#f59e0b', fillColor: '#f97316', fillOpacity: 1, weight: 2 }} />
+              <Polyline positions={backwardPath} pathOptions={{ color: '#00F0FF', dashArray: '5, 5', weight: 1 }} />
+              <Polyline positions={forwardPath} pathOptions={{ color: '#0EA5E9', weight: 1 }} />
+              <CircleMarker center={[drift.origin_estimate.lat, drift.origin_estimate.lon]} radius={4} pathOptions={{ color: '#00F0FF', fillColor: '#00F0FF', fillOpacity: 1, weight: 1 }} />
+              <CircleMarker center={[spill.center_lat, spill.center_lon]} radius={4} pathOptions={{ color: spill.severity === 'critical' ? '#FF2A5F' : '#00F0FF', fillColor: spill.severity === 'critical' ? '#FF2A5F' : '#00F0FF', fillOpacity: 1, weight: 1 }} />
             </MapContainer>
           </div>
         </GlassCard>

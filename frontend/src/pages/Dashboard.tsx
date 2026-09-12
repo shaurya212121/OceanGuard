@@ -38,13 +38,14 @@ export default function Dashboard() {
           </div>
           <div className="flex-1 bg-navy-950">
             <MapContainer center={[14.5, 75.1]} zoom={6} className="h-full w-full" zoomControl={false}>
-              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}" />
+              <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}" />
               {spills.map(spill => (
                 <CircleMarker 
                   key={spill.id} 
                   center={[spill.center_lat, spill.center_lon]} 
-                  radius={12}
-                  pathOptions={{ color: '#f97316', fillColor: '#f59e0b', fillOpacity: 0.5, weight: 2 }}
+                  radius={5}
+                  pathOptions={{ color: spill.severity === 'critical' ? '#FF2A5F' : '#00F0FF', fillColor: spill.severity === 'critical' ? '#FF2A5F' : '#00F0FF', fillOpacity: 0.8, weight: 1 }}
                 >
                   <Popup className="custom-popup">
                     <div className="text-navy-950 font-bold">{spill.name}</div>
@@ -87,7 +88,7 @@ export default function Dashboard() {
                     <td className="py-3 font-mono text-sm">{spill.id}</td>
                     <td className="py-3 font-medium">{spill.name}</td>
                     <td className="py-3"><SeverityBadge severity={spill.severity} /></td>
-                    <td className="py-3 text-sm text-text-muted">{new Date(spill.detected_at).toLocaleDateString()}</td>
+                    <td className="py-3 font-mono text-sm text-text-muted">{new Date(spill.detected_at).toLocaleDateString()}</td>
                     <td className="py-3">
                       <Link to={`/investigation/${scenarioId}`} className="text-ocean hover:text-ocean-light text-sm font-medium">Investigate →</Link>
                     </td>

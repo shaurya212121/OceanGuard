@@ -12,8 +12,8 @@ const typeData = [
 ];
 
 const severityData = [
-  { name: 'Critical', value: 4, color: '#ef4444' }, { name: 'High', value: 8, color: '#f97316' }, 
-  { name: 'Medium', value: 15, color: '#f59e0b' }, { name: 'Low', value: 5, color: '#10b981' }
+  { name: 'Critical', value: 4, color: '#FF2A5F' }, { name: 'High', value: 8, color: '#FFB100' }, 
+  { name: 'Medium', value: 15, color: '#00F0FF' }, { name: 'Low', value: 5, color: '#00FFAA' }
 ];
 
 export default function Reports() {
@@ -27,11 +27,11 @@ export default function Reports() {
           <div className="flex-1">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={trendData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f" vertical={false} />
-                <XAxis dataKey="month" stroke="#64748b" tick={{fill: '#94a3b8'}} />
-                <YAxis stroke="#64748b" tick={{fill: '#94a3b8'}} />
-                <Tooltip contentStyle={{backgroundColor: '#111d32', borderColor: '#1e3a5f', color: '#f1f5f9'}} />
-                <Line type="monotone" dataKey="spills" stroke="#06b6d4" strokeWidth={3} dot={{r: 4, fill: '#06b6d4'}} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#2A332F" vertical={false} />
+                <XAxis dataKey="month" stroke="#E8E4D8" tick={{fill: '#E8E4D8', fontFamily: 'IBM Plex Mono', fontSize: 12}} />
+                <YAxis stroke="#E8E4D8" tick={{fill: '#E8E4D8', fontFamily: 'IBM Plex Mono', fontSize: 12}} />
+                <Tooltip contentStyle={{backgroundColor: '#141C19', borderColor: '#2A332F', color: '#E8E4D8', fontFamily: 'IBM Plex Mono'}} />
+                <Line type="monotone" dataKey="spills" stroke="#00F0FF" strokeWidth={2} dot={{r: 4, fill: '#00F0FF'}} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -42,11 +42,11 @@ export default function Reports() {
           <div className="flex-1">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={typeData} layout="vertical" margin={{left: 20}}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f" horizontal={false} />
-                <XAxis type="number" stroke="#64748b" />
-                <YAxis dataKey="name" type="category" stroke="#64748b" width={80} />
-                <Tooltip contentStyle={{backgroundColor: '#111d32', borderColor: '#1e3a5f', color: '#f1f5f9'}} />
-                <Bar dataKey="count" fill="#0891b2" radius={[0, 4, 4, 0]} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#2A332F" horizontal={false} />
+                <XAxis type="number" stroke="#E8E4D8" />
+                <YAxis dataKey="name" type="category" stroke="#E8E4D8" width={80} />
+                <Tooltip contentStyle={{backgroundColor: '#141C19', borderColor: '#2A332F', color: '#E8E4D8'}} />
+                <Bar dataKey="count" fill="#0EA5E9" />
               </BarChart>
             </ResponsiveContainer>
           </div>
