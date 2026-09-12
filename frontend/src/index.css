@@ -1,0 +1,46 @@
+@import 'tailwindcss';
+@import 'leaflet/dist/leaflet.css';
+
+@theme {
+  --color-navy-950: #0a1628;
+  --color-navy-900: #111d32;
+  --color-navy-800: #1a2744;
+  --color-navy-700: #243556;
+  --color-navy-600: #1e3a5f;
+  --color-ocean: #06b6d4;
+  --color-ocean-light: #22d3ee;
+  --color-ocean-glow: #0891b2;
+  --color-spill: #f59e0b;
+  --color-spill-dark: #92400e;
+  --color-danger: #ef4444;
+  --color-warning: #f97316;
+  --color-safe: #10b981;
+  --color-text: #f1f5f9;
+  --color-text-muted: #94a3b8;
+  --color-text-dim: #64748b;
+  --color-line: #1e3a5f;
+}
+
+body {
+  background-color: var(--color-navy-950);
+  color: var(--color-text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--color-navy-900); }
+::-webkit-scrollbar-thumb { background: var(--color-navy-600); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-ocean); }
+
+/* Leaflet dark theme override */
+.leaflet-container { background: #0a1628 !important; font-family: inherit; }
+.leaflet-tile-pane { filter: brightness(0.7) saturate(0.8); }
+.leaflet-control-zoom a { background: #1a2744 !important; color: #f1f5f9 !important; border-color: #1e3a5f !important; }
+
+/* Pulsing animation for alerts */
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+.pulse-ring { animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite; }

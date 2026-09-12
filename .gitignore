@@ -1,0 +1,35 @@
+# Node/Frontend
+node_modules/
+dist/
+build/
+.env
+.env.local
+
+# Python/Backend
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+pip-log.txt
+
+# Databases & Data
+*.sqlite3
+*.db
+data/*.csv
+data/*.geojson
+!data/.keep
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build artifacts
+tsconfig.tsbuildinfo
