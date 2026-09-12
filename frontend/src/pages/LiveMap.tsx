@@ -30,7 +30,7 @@ export default function LiveMap() {
       <MapContainer center={[14.5, 75.1]} zoom={6} className="h-full w-full">
         <LayersControl position="topright">
           <LayersControl.BaseLayer checked name="Dark Matter">
-            <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           </LayersControl.BaseLayer>
           <LayersControl.BaseLayer name="Satellite">
             <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />

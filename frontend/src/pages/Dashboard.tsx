@@ -38,7 +38,7 @@ export default function Dashboard() {
           </div>
           <div className="flex-1 bg-navy-950">
             <MapContainer center={[14.5, 75.1]} zoom={6} className="h-full w-full" zoomControl={false}>
-              <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               {spills.map(spill => (
                 <CircleMarker 
                   key={spill.id} 

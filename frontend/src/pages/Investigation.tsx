@@ -61,7 +61,7 @@ export default function Investigation() {
           </div>
           <div className="flex-1 bg-navy-950">
             <MapContainer center={[spill.center_lat, spill.center_lon]} zoom={9} className="h-full w-full">
-              <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               {spill.polygon_coords && spill.polygon_coords.length > 0 && (
                 <Polygon positions={spill.polygon_coords as [number, number][]} pathOptions={{ color: '#f59e0b', fillColor: '#f97316', fillOpacity: 0.3, weight: 2 }} />
               )}
