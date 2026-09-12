@@ -63,12 +63,12 @@ export function fetchVessels(): Promise<VesselSummary[]> {
   return api<VesselSummary[]>('/vessels/');
 }
 
-export function fetchVessel(imo: string): Promise<VesselTrack> {
-  return api<VesselTrack>(`/vessels/${imo}`);
+export function fetchVessel(mmsi: string): Promise<VesselTrack> {
+  return api<VesselTrack>(`/vessels/${mmsi}`);
 }
 
-export function fetchVesselTrack(imo: string): Promise<Array<{ lat: number; lon: number; timestamp: string }>> {
-  return api(`/vessels/${imo}/track`);
+export function fetchVesselTrack(mmsi: string): Promise<Array<{ lat: number; lon: number; timestamp: string }>> {
+  return api(`/vessels/${mmsi}/track`);
 }
 
 // ─── Analysis (on-demand) ────────────────────────────────────────────

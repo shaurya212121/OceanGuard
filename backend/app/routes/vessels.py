@@ -9,9 +9,10 @@ router = APIRouter()
 async def list_vessels():
     state = get_state()
     res = []
-    for imo, v in state["vessels"].items():
+    for mmsi, v in state["vessels"].items():
         last_pos = v.positions[-1] if v.positions else None
         res.append({
+            "mmsi": v.mmsi,
             "imo_number": v.imo_number,
             "name": v.name,
             "vessel_type": v.vessel_type,
@@ -24,17 +25,17 @@ async def list_vessels():
         })
     return res
 
-@router.get("/{imo_number}", response_model=VesselTrack)
-async def get_vessel(imo_number: str):
+@router.get("/{mmsi}", response_model=VesselTrack)
+async def get_vessel(mmsi: str):
     state = get_state()
-    if imo_number not in state["vessels"]:
+    if mmsi not in state["vessels"]:
         raise HTTPException(status_code=404, detail="Vessel not found")
-    return state["vessels"][imo_number]
+    return state["vessels"][mmsi]
 
-@router.get("/{imo_number}/track", response_model=List[Dict[str, Any]])
-async def get_vessel_track(imo_number: str):
+@router.get("/{mmsi}/track", response_model=List[Dict[str, Any]])
+async def get_vessel_track(mmsi: str):
     state = get_state()
-    if imo_number not in state["vessels"]:
+    if mmsi not in state["vessels"]:
         raise HTTPException(status_code=404, detail="Vessel not found")
-    v = state["vessels"][imo_number]
+    v = state["vessels"][mmsi]
     return [{"lat": p.lat, "lon": p.lon, "timestamp": p.timestamp} for p in v.positions]

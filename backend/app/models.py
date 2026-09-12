@@ -24,14 +24,16 @@ class VesselPosition(BaseModel):
     heading: float
 
 class VesselTrack(BaseModel):
-    imo_number: str
+    mmsi: str
+    imo_number: Optional[str] = None
     name: str
     flag_country: str
     vessel_type: str
     positions: List[VesselPosition]
 
 class SuspectVessel(BaseModel):
-    imo_number: str
+    mmsi: str
+    imo_number: Optional[str] = None
     name: str
     flag_country: str
     vessel_type: str

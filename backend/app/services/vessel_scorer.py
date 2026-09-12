@@ -78,6 +78,7 @@ def score_vessels(spill_origin_lat: float, spill_origin_lon: float, spill_time, 
             
         if score > 0:
             suspects.append(SuspectVessel(
+                mmsi=vessel.mmsi,
                 imo_number=vessel.imo_number,
                 name=vessel.name,
                 flag_country=vessel.flag_country,

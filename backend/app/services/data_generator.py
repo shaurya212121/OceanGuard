@@ -1,3 +1,4 @@
+import os
 import random
 import uuid
 import math
@@ -33,6 +34,7 @@ def generate_vessels(base_time: datetime, count: int = 15) -> List[VesselTrack]:
     
     for i in range(count):
         vessel = VesselTrack(
+            mmsi=f"353{random.randint(100000, 999999)}",
             imo_number=f"IMO{random.randint(1000000, 9999999)}",
             name=f"MV Vessel_{i}",
             flag_country=random.choice(flags),
@@ -80,6 +82,7 @@ def generate_vessels(base_time: datetime, count: int = 15) -> List[VesselTrack]:
 def generate_guilty_vessel(base_time: datetime, origin_lat: float, origin_lon: float, spill_time: datetime) -> VesselTrack:
     # Guilty vessel MV Darkwater
     vessel = VesselTrack(
+        mmsi="636098765",
         imo_number="IMO9876543",
         name="MV Darkwater",
         flag_country="Liberia",
@@ -206,6 +209,17 @@ def generate_all_data() -> Dict[str, Any]:
     guilty_vessel = generate_guilty_vessel(base_time, drift1.origin_estimate.lat, drift1.origin_estimate.lon, spill1_time)
     vessels.append(guilty_vessel)
     
+    # Load real AIS data if available
+    csv_path = os.path.join(os.path.dirname(__file__), '../../data/sample_ais.csv')
+    if os.path.exists(csv_path):
+        from .ais_loader import load_ais_csv
+        try:
+            real_vessels = load_ais_csv(csv_path)
+            if real_vessels:
+                vessels.extend(real_vessels)
+        except Exception as e:
+            print(f"Error loading real AIS data: {e}")
+            
     # Score for scenario 1
     suspects1 = score_vessels(drift1.origin_estimate.lat, drift1.origin_estimate.lon, spill1_time, vessels)
     suspects2 = score_vessels(drift2.origin_estimate.lat, drift2.origin_estimate.lon, spill2_time, vessels)
@@ -217,7 +231,7 @@ def generate_all_data() -> Dict[str, Any]:
     
     alerts = [
         Alert(id=str(uuid.uuid4()), timestamp=base_time-timedelta(hours=5), message="Critical: Large crude oil spill detected in Arabian Sea", severity="critical"),
-        Alert(id=str(uuid.uuid4()), timestamp=base_time-timedelta(hours=4), message="Warning: Vessel IMO9876543 exhibited AIS gap near spill origin", severity="high"),
+        Alert(id=str(uuid.uuid4()), timestamp=base_time-timedelta(hours=4), message="Warning: Vessel 636098765 exhibited AIS gap near spill origin", severity="high"),
         Alert(id=str(uuid.uuid4()), timestamp=base_time-timedelta(hours=2), message="Info: Drift model updated for Bay of Bengal incident", severity="info"),
         Alert(id=str(uuid.uuid4()), timestamp=base_time-timedelta(hours=1), message="Warning: Spill approaching Lakshadweep marine sanctuary", severity="medium")
     ]
@@ -225,7 +239,7 @@ def generate_all_data() -> Dict[str, Any]:
     stats = DashboardStats(
         total_spills=3,
         active_investigations=2,
-        vessels_tracked=15,
+        vessels_tracked=len(vessels),
         alerts_today=4,
         total_area_affected_sq_km=59.8,
         highest_severity="critical"
@@ -237,7 +251,7 @@ def generate_all_data() -> Dict[str, Any]:
             scenario2.spill.id: scenario2,
             scenario3.spill.id: scenario3
         },
-        "vessels": {v.imo_number: v for v in vessels},
+        "vessels": {v.mmsi: v for v in vessels},
         "alerts": alerts,
         "stats": stats,
         "spills": [spill1, spill2, spill3]

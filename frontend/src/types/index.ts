@@ -15,7 +15,8 @@ export interface Spill {
 
 // ─── Vessel (list endpoint summary) ──────────────────────────────────
 export interface VesselSummary {
-  imo_number: string;
+  mmsi: string;
+  imo_number?: string;
   name: string;
   vessel_type: string;
   flag_country: string;
@@ -37,7 +38,8 @@ export interface VesselPosition {
 
 // ─── Full Vessel Track ───────────────────────────────────────────────
 export interface VesselTrack {
-  imo_number: string;
+  mmsi: string;
+  imo_number?: string;
   name: string;
   flag_country: string;
   vessel_type: string;
@@ -46,7 +48,8 @@ export interface VesselTrack {
 
 // ─── Suspect Vessel ──────────────────────────────────────────────────
 export interface SuspectVessel {
-  imo_number: string;
+  mmsi: string;
+  imo_number?: string;
   name: string;
   flag_country: string;
   vessel_type: string;
