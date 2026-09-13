@@ -2,3 +2,5 @@ import os
 
 DATABASE_PATH = os.getenv('DATABASE_PATH', 'data/oceanguard.db')
 CORS_ORIGINS = ['http://localhost:5173', 'http://localhost:3000']
+OPERATING_MODE = os.getenv('OPERATING_MODE', 'SYNTHETIC_BENCHMARK_MODE') # REAL_DATA_MODE | SYNTHETIC_BENCHMARK_MODE
+MAX_UPLOAD_SIZE_MB = 50

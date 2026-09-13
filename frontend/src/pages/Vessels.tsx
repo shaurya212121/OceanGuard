@@ -15,6 +15,7 @@ export default function Vessels() {
   const filtered = vessels.filter(
     v =>
       (v.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (v.mmsi || '').includes(searchTerm) ||
       (v.imo_number || '').includes(searchTerm)
   );
 
@@ -26,10 +27,10 @@ export default function Vessels() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
           <input 
             type="text" 
-            placeholder="Search by Name or IMO..." 
+            placeholder="Search by Name, MMSI, or IMO..." 
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="bg-navy-900 border border-line rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-ocean w-64"
+            className="bg-navy-900 border border-line rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-ocean w-72"
           />
         </div>
       </div>
@@ -39,6 +40,7 @@ export default function Vessels() {
           <table className="w-full text-left">
             <thead className="bg-navy-800">
               <tr className="text-text-muted text-sm border-b border-line">
+                <th className="p-4 font-medium">MMSI</th>
                 <th className="p-4 font-medium">IMO</th>
                 <th className="p-4 font-medium">Name</th>
                 <th className="p-4 font-medium">Type</th>
@@ -49,8 +51,9 @@ export default function Vessels() {
             </thead>
             <tbody>
               {filtered.map(v => (
-                <tr key={v.imo_number} className="border-b border-line last:border-0 hover:bg-navy-800/30 transition-colors">
-                  <td className="p-4 font-mono text-sm">{v.imo_number}</td>
+                <tr key={v.mmsi} className="border-b border-line last:border-0 hover:bg-navy-800/30 transition-colors">
+                  <td className="p-4 font-mono text-sm text-ocean">{v.mmsi}</td>
+                  <td className="p-4 font-mono text-sm text-text-muted">{v.imo_number || 'N/A'}</td>
                   <td className="p-4 font-medium">{v.name}</td>
                   <td className="p-4 text-sm text-text-muted">{v.vessel_type}</td>
                   <td className="p-4 text-sm">{v.flag_country}</td>

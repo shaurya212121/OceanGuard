@@ -123,7 +123,7 @@ def generate_guilty_vessel(base_time: datetime, origin_lat: float, origin_lon: f
                 speed_knots=speed_pre,
                 heading=heading_pre
             ))
-        elif time_diff_hours == 0: # At origin
+        elif abs(time_diff_hours) < 0.25: # At origin
             vessel.positions.append(VesselPosition(
                 lat=origin_lat,
                 lon=origin_lon,
@@ -150,59 +150,74 @@ def generate_guilty_vessel(base_time: datetime, origin_lat: float, origin_lon: f
     return vessel
 
 
+from .drift_engine import simulate_drift_engine
+from .attribution_engine import score_vessels_multi_factor
+from .sar_pipeline import process_sar_image
+from ..models import DataProvenance
+
 def generate_all_data() -> Dict[str, Any]:
-    base_time = datetime.utcnow()
+    base_time = datetime.utcnow().replace(microsecond=0)
     
-    # Spills
+    # Characterize Spills with SAR Pipeline
+    char1 = process_sar_image(None, 18.5, 70.2)
+    char2 = process_sar_image(None, 11.8, 72.5)
+    char3 = process_sar_image(None, 14.2, 82.8)
+
     spill1_time = base_time - timedelta(hours=6)
     spill1 = OilSpill(
-        id=str(uuid.uuid4()),
-        name="Arabian Sea Spill",
+        id="scenario-1",
+        name="Arabian Sea Incident",
         detected_at=spill1_time,
         center_lat=18.5,
         center_lon=70.2,
-        area_sq_km=45.2,
+        area_sq_km=char1.area_sq_km,
         severity="critical",
         status="investigating",
-        polygon_coords=generate_polygon(18.5, 70.2, 12, 0.15),
+        polygon_coords=char1.polygon_coords,
         estimated_volume_liters=1500000.0,
-        spill_type="crude"
+        spill_type="crude",
+        provenance=DataProvenance(data_type="SYNTHETIC_DEMO_DATA", source_name="SIH Benchmark Scenario 1", is_live=False),
+        characterization=char1
     )
     
     spill2_time = base_time - timedelta(hours=18)
     spill2 = OilSpill(
-        id=str(uuid.uuid4()),
-        name="Lakshadweep Corridor Spill",
+        id="scenario-2",
+        name="Lakshadweep Corridor Incident",
         detected_at=spill2_time,
         center_lat=11.8,
         center_lon=72.5,
-        area_sq_km=12.5,
+        area_sq_km=char2.area_sq_km,
         severity="medium",
         status="detected",
-        polygon_coords=generate_polygon(11.8, 72.5, 8, 0.08),
+        polygon_coords=char2.polygon_coords,
         estimated_volume_liters=500000.0,
-        spill_type="refined"
+        spill_type="refined",
+        provenance=DataProvenance(data_type="SYNTHETIC_DEMO_DATA", source_name="SIH Benchmark Scenario 2", is_live=False),
+        characterization=char2
     )
     
     spill3_time = base_time - timedelta(hours=36)
     spill3 = OilSpill(
-        id=str(uuid.uuid4()),
-        name="Bay of Bengal Incident",
+        id="scenario-3",
+        name="Bay of Bengal Slick",
         detected_at=spill3_time,
         center_lat=14.2,
         center_lon=82.8,
-        area_sq_km=2.1,
+        area_sq_km=char3.area_sq_km,
         severity="low",
         status="resolved",
-        polygon_coords=generate_polygon(14.2, 82.8, 10, 0.05),
+        polygon_coords=char3.polygon_coords,
         estimated_volume_liters=50000.0,
-        spill_type="unknown"
+        spill_type="unknown",
+        provenance=DataProvenance(data_type="SYNTHETIC_DEMO_DATA", source_name="SIH Benchmark Scenario 3", is_live=False),
+        characterization=char3
     )
     
-    # Drifts
-    drift1 = simulate_drift(spill1.center_lat, spill1.center_lon, base_time, 12, 12, 0.5, 45) # current towards NE
-    drift2 = simulate_drift(spill2.center_lat, spill2.center_lon, base_time, 24, 12, 0.3, 90)
-    drift3 = simulate_drift(spill3.center_lat, spill3.center_lon, base_time, 48, 12, 0.4, 180)
+    # Drifts using physical drift_engine
+    drift1 = simulate_drift_engine(spill1.center_lat, spill1.center_lon, spill1_time, hours_back=6, hours_forward=12, current_speed_knots=0.8, current_dir_deg=45)
+    drift2 = simulate_drift_engine(spill2.center_lat, spill2.center_lon, spill2_time, hours_back=18, hours_forward=12, current_speed_knots=0.4, current_dir_deg=90)
+    drift3 = simulate_drift_engine(spill3.center_lat, spill3.center_lon, spill3_time, hours_back=24, hours_forward=12, current_speed_knots=0.5, current_dir_deg=180)
     
     # Vessels
     vessels = generate_vessels(base_time, 14)
@@ -218,22 +233,22 @@ def generate_all_data() -> Dict[str, Any]:
             if real_vessels:
                 vessels.extend(real_vessels)
         except Exception as e:
-            print(f"Error loading real AIS data: {e}")
+            print(f"Error loading AIS data: {e}")
             
-    # Score for scenario 1
-    suspects1 = score_vessels(drift1.origin_estimate.lat, drift1.origin_estimate.lon, spill1_time, vessels)
-    suspects2 = score_vessels(drift2.origin_estimate.lat, drift2.origin_estimate.lon, spill2_time, vessels)
-    suspects3 = score_vessels(drift3.origin_estimate.lat, drift3.origin_estimate.lon, spill3_time, vessels)
+    # Multi-factor explainable attribution scoring
+    suspects1 = score_vessels_multi_factor(spill1.polygon_coords, drift1.source_region, spill1_time, vessels, drift1)
+    suspects2 = score_vessels_multi_factor(spill2.polygon_coords, drift2.source_region, spill2_time, vessels, drift2)
+    suspects3 = score_vessels_multi_factor(spill3.polygon_coords, drift3.source_region, spill3_time, vessels, drift3)
     
     scenario1 = SpillScenario(spill=spill1, drift=drift1, vessels=vessels, suspects=suspects1)
     scenario2 = SpillScenario(spill=spill2, drift=drift2, vessels=vessels, suspects=suspects2)
     scenario3 = SpillScenario(spill=spill3, drift=drift3, vessels=vessels, suspects=suspects3)
     
     alerts = [
-        Alert(id=str(uuid.uuid4()), timestamp=base_time-timedelta(hours=5), message="Critical: Large crude oil spill detected in Arabian Sea", severity="critical"),
-        Alert(id=str(uuid.uuid4()), timestamp=base_time-timedelta(hours=4), message="Warning: Vessel 636098765 exhibited AIS gap near spill origin", severity="high"),
-        Alert(id=str(uuid.uuid4()), timestamp=base_time-timedelta(hours=2), message="Info: Drift model updated for Bay of Bengal incident", severity="info"),
-        Alert(id=str(uuid.uuid4()), timestamp=base_time-timedelta(hours=1), message="Warning: Spill approaching Lakshadweep marine sanctuary", severity="medium")
+        Alert(id=str(uuid.uuid4()), timestamp=base_time-timedelta(hours=5), message="Critical: SAR Slick detected in Arabian Sea", severity="critical"),
+        Alert(id=str(uuid.uuid4()), timestamp=base_time-timedelta(hours=4), message="Warning: Vessel 636098765 exhibited AIS gap near spill origin window", severity="high"),
+        Alert(id=str(uuid.uuid4()), timestamp=base_time-timedelta(hours=2), message="Info: Particle drift model updated for Bay of Bengal incident", severity="info"),
+        Alert(id=str(uuid.uuid4()), timestamp=base_time-timedelta(hours=1), message="Warning: Predicted drift trajectory approaching marine area", severity="medium")
     ]
     
     stats = DashboardStats(
@@ -241,8 +256,9 @@ def generate_all_data() -> Dict[str, Any]:
         active_investigations=2,
         vessels_tracked=len(vessels),
         alerts_today=4,
-        total_area_affected_sq_km=59.8,
-        highest_severity="critical"
+        total_area_affected_sq_km=round(spill1.area_sq_km + spill2.area_sq_km + spill3.area_sq_km, 1),
+        highest_severity="critical",
+        provenance_data_type="SYNTHETIC_DEMO_DATA"
     )
     
     return {
