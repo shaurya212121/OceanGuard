@@ -1,160 +1,622 @@
-# 🛢️ OceanGuard AI — Marine Oil Spill Detection & Vessel Attribution System
+# 🛢️ OceanGuard AI — Marine Oil Spill Detection & Vessel Attribution
 
-> **Smart India Hackathon (SIH) 2026 — Problem Statement SIH26143**  
-> *Leveraging satellite imagery to determine oil spills at sea along with AIS data correlations to identify the vessel responsible for the spill.*
-
----
-
-## 📌 Executive Summary
-
-**OceanGuard AI** is an end-to-end geospatial intelligence and decision-support prototype designed for maritime environmental protection agencies (such as the Indian Coast Guard and DG Shipping). It ingests Synthetic Aperture Radar (SAR) satellite rasters, extracts dark slick geometries, reverse-simulates ocean/wind drift trajectories (hindcasting), cross-references historical Automatic Identification System (AIS) vessel movement logs, ranks candidate suspect vessels using a transparent multi-factor evidence score, and validates candidates via counterfactual drift simulation.
-
-> [!IMPORTANT]
-> **Decision Support Disclaimer**: OceanGuard AI provides analytical decision support by evaluating physical, spatial, and temporal consistency between slick observations and vessel tracks. It designates ships as **Investigation Candidates** or **Priority Candidates** rather than declaring legal guilt.
+> **Smart India Hackathon 2026 — Problem Statement SIH26143**
+> An end-to-end decision-support system for detecting marine oil-spill candidates from SAR imagery, estimating probable source regions through drift modelling, correlating AIS vessel tracks, and ranking candidate vessels using transparent, explainable evidence.
 
 ---
 
-## 🌟 Key Capabilities & System Pipeline
+## 🌊 Overview
 
+**OceanGuard AI** is a geospatial intelligence platform designed to assist investigators in answering:
+
+> **“Where did this suspected oil spill originate, and which vessels were plausibly associated with it?”**
+
+The system combines:
+
+**SAR imagery → slick detection → drift hindcasting → probable source region → AIS correlation → vessel attribution → counterfactual validation → investigation dossier**
+
+OceanGuard is designed as a **decision-support and investigation system**, not as an autonomous legal or enforcement authority. Vessel attribution results represent evidence-based candidate rankings and should be independently verified.
+
+---
+
+## 🔬 Core Pipeline
+
+### 1. 🛰️ SAR Spill Detection
+
+The system processes SAR imagery to identify dark backscatter anomalies that may correspond to oil slicks.
+
+The current implementation uses:
+
+* Grayscale SAR analysis
+* Otsu-based thresholding
+* Contour extraction
+* Geometric feature analysis
+* Contrast and compactness measurements
+* Look-alike classification heuristics
+* Geospatial area estimation
+
+The current detector is explicitly identified as:
+
+```text
+HEURISTIC_BASELINE_V1
 ```
-┌─────────────────┐    ┌────────────────────┐    ┌─────────────────────┐
-│ Satellite SAR   │───>│ Dark Slick         │───>│ Lagrangian Particle │
-│ Raster Upload   │    │ Characterization   │    │ Drift Hindcasting   │
-└─────────────────┘    └────────────────────┘    └─────────────────────┘
-                                                            │
-┌─────────────────┐    ┌────────────────────┐               │
-│ PDF / JSON      │<───│ Counterfactual     │<──────────────┘
-│ Incident Report │    │ Drift Validation   │               │
-└─────────────────┘    └────────────────────┘               │
-         ▲                        ▲                         ▼
-         │                        │              ┌─────────────────────┐
-         └────────────────────────┴──────────────│ AIS Candidate       │
-                                                 │ Multi-Factor Score  │
-                                                 └─────────────────────┘
+
+It is **not represented as a trained deep-learning model**.
+
+The architecture is designed to allow a trained segmentation model to be integrated later.
+
+---
+
+### 2. 🌊 Drift Hindcasting
+
+Once a candidate slick is identified, OceanGuard estimates where the slick could have originated by propagating particles backward through environmental forcing.
+
+The drift engine supports:
+
+* Lagrangian multi-particle simulation
+* Backward trajectory estimation
+* Wind/current forcing
+* Spatial environmental velocity fields
+* Source-region estimation
+* Particle-cloud analysis
+* Convex-hull source-region construction
+* Release-time window estimation
+
+The environmental layer uses an abstraction:
+
+```text
+EnvironmentalProvider
+├── SyntheticEnvironmentalProvider
+└── NetCDFEnvironmentalProvider
 ```
 
-1. **SAR Satellite Imagery Processing & Land Masking**: Ingests Sentinel-1 GeoTIFF/PNG rasters, applies 2D Median speckle reduction filter, land masking, and Otsu adaptive thresholding to extract 2D GeoJSON slick geometries. Computes area, perimeter, and heuristic look-alike classification probabilities (*Oil Spill*, *Low Wind Area*, *Ship Wake*, *Biogenic Film*, *Rain Formation*).
-2. **Lagrangian Ensemble Drift Simulation (Hindcasting & Forecasting)**: Models oil movement using a multi-particle Lagrangian drift ensemble. Backward drift calculation estimates the initial release location (Source Region convex hull) and release window. Forward drift projects future spill dispersal.
-3. **AIS Vessel Trajectory Analysis**: Queries historical vessel positions across the spatio-temporal release window.
-4. **Transparent Multi-Factor Evidence Scoring**: Ranks candidate vessels using an unweighted/weighted multi-factor evidence breakdown:
-   - **Spatial Distance to Source Region** ($S_{\text{spatial}}$)
-   - **Temporal Alignment to Release Window** ($S_{\text{temporal}}$)
-   - **Trajectory Interception / Proximity** ($S_{\text{trajectory}}$)
-   - **Speed Anomaly Detection** ($S_{\text{speed}}$)
-   - **AIS Transponder Gap Penalty** ($S_{\text{gap}}$)
-5. **Counterfactual Physical Validation**: Simulates forward drift from candidate vessel locations during the estimated release window to compute **Polygon Intersection-over-Union (IoU)** between predicted and observed slick polygons.
-6. **Data Provenance & Audit Trail**: Every analysis result carries explicit provenance tags (`REAL_DATA_MODE` vs `SYNTHETIC_BENCHMARK_MODE`, `DATA_SOURCE`, `PROCESSING_TIMESTAMP`, `ALGORITHM_VERSION`) to guarantee zero hallucinated metrics.
-7. **Empirical Benchmark & Evaluation**: Calculates real precision, recall, F1-score, and IoU against ground-truth benchmark datasets without metric boosting.
+This allows synthetic benchmark scenarios and real environmental datasets to remain strictly separated.
 
 ---
 
-## 🏛️ System Architecture & Tech Stack
+### 3. 🚢 AIS Vessel Correlation
 
-| Layer | Technology | Function |
-|---|---|---|
-| **Frontend UI** | React 19, TypeScript, Vite, Tailwind CSS, Lucide Icons | Responsive spatial dashboard & investigation console |
-| **Mapping & Geospatial** | Leaflet, React-Leaflet, CartoDB Dark Tiles | Interactive map displaying slick polygons, drift vectors, and vessel tracks |
-| **Analytics & Charts** | Recharts | Evidence breakdown radar/bar charts, look-alike breakdown |
-| **Backend API** | Python 3.10+, FastAPI, Pydantic v2, Uvicorn | Asynchronous REST endpoints & background job manager |
-| **Geospatial & Math** | Shapely, NumPy, SciPy, OpenCV (headless) | Spatial polygon operations, raster thresholding, hull extraction |
-| **Database** | SQLite (`data/oceanguard.db`), Python `sqlite3` | Persistent relational store for incidents, observations, vessels, and jobs |
-| **Testing** | Automated Python Test Suite (`backend/tests/`) | End-to-end integration and mathematical test validation |
+OceanGuard correlates vessel positions with the estimated release region and time window.
 
----
+The AIS pipeline supports MarineCadastre-compatible data and applies:
 
-## ⚙️ Operating Modes & Provenance Rules
+* Spatial filtering
+* Temporal filtering
+* Release-window filtering
+* Vessel trajectory analysis
+* Speed/behaviour analysis
+* AIS gap analysis
+* Candidate vessel generation
 
-OceanGuard AI strictly enforces data integrity:
-
-- **`REAL_DATA_MODE`**: Strictly requires valid satellite GeoTIFF/PNG upload or real AIS data input. Rejects missing data without synthetic fallbacks.
-- **`SYNTHETIC_BENCHMARK_MODE`**: Operates on verified benchmark test scenarios (`BOMBAY_HIGH_SPILL`, `GUJARAT_COAST_INCIDENT`, `CHENNAI_PORT_LEAK`). All outputs are explicitly tagged as `[ PROVENANCE: DEMO / SYNTHETIC DATA ]`.
+Synthetic AIS data is explicitly labelled as synthetic benchmark data and is not permitted to contaminate `REAL_DATA_MODE`.
 
 ---
 
-## 🗄️ Database Schema (`data/oceanguard.db`)
+### 4. 🧠 Explainable Vessel Attribution
 
-- **`incidents`**: Incident metadata, status, spatial coordinates, created timestamp.
-- **`satellite_observations`**: SAR imagery metadata, area, perimeter, look-alike probabilities, GeoJSON polygon.
-- **`drift_runs`**: Drift simulation parameters, backward/forward path vectors, source region polygon.
-- **`vessels`**: MMSI, name, vessel type, callsign, flag, length, width.
-- **`ais_positions`**: Time-stamped lat/lon coordinates, speed over ground (SOG), course over ground (COG).
-- **`attribution_candidates`**: Calculated candidate scores, evidence breakdowns, counterfactual IoU, candidate rank.
-- **`analysis_jobs`**: Job ID, current status (`QUEUED`, `PROCESSING`, `COMPLETED`, `FAILED`), execution progress.
+Candidate vessels are ranked using a transparent multi-factor evidence model.
+
+The attribution engine evaluates factors including:
+
+* Proximity to probable source region
+* Temporal compatibility
+* Trajectory consistency
+* Speed behaviour
+* AIS continuity/gaps
+* Drift compatibility
+* Counterfactual overlap
+
+Rather than producing an unexplained black-box probability, OceanGuard exposes the contributing evidence for each candidate.
+
+### ⚠️ Important
+
+The attribution score is a **derived heuristic evidence score**, not a probability of legal responsibility.
+
+A high-ranked vessel should be interpreted as:
+
+> **“A vessel whose observed behaviour and trajectory are more consistent with the estimated spill scenario.”**
+
+It is not proof that the vessel caused the spill.
 
 ---
 
-## 🧪 Scientific & Mathematical Baseline Methods
+## 🔄 Counterfactual Validation
 
-### 1. Dark Slick Segmentation
-- **Pre-processing**: $3 \times 3$ 2D Median Filter for speckle noise reduction.
-- **Thresholding**: Otsu Adaptive Binarization to extract dark ocean backscatter anomalies ($I < I_{\text{otsu}}$).
-- **Geometry**: Extraction of outer boundary contour transformed into WGS84 GeoJSON polygons using `shapely`.
+OceanGuard performs candidate-specific forward drift simulations to test whether a suspected vessel's position could plausibly produce the observed slick.
 
-### 2. Lagrangian Particle Drift Model
-Each particle $p_i$ is updated over time step $\Delta t$:
-$$\vec{x}_{t+\Delta t} = \vec{x}_t + \left( \vec{U}_{\text{current}} + \alpha \vec{U}_{\text{wind}} + \vec{\epsilon}_{\text{turbulent}} \right) \Delta t$$
-where $\alpha = 0.03$ (wind leeway factor), $\vec{U}_{\text{wind}}$ is wind velocity vector rotated by $15^\circ$ Ekman deflection, and $\vec{\epsilon}_{\text{turbulent}}$ represents Gaussian random turbulence.
+The system compares:
 
-### 3. Counterfactual Polygon IoU
-$$\text{IoU} = \frac{\text{Area}(P_{\text{simulated}} \cap P_{\text{observed}})}{\text{Area}(P_{\text{simulated}} \cup P_{\text{observed}})}$$
+```text
+Predicted Slick
+      vs.
+Observed Slick
+```
+
+using polygon intersection-over-union:
+
+```text
+IoU = Area(Predicted ∩ Observed)
+      --------------------------
+      Area(Predicted ∪ Observed)
+```
+
+This provides an additional physical/geometric consistency check beyond simple proximity.
 
 ---
 
-## 🚀 Getting Started
+## 🧪 Real Data vs Synthetic Benchmark Mode
 
-### 1. Prerequisites
-- Python 3.10 or higher
-- Node.js 18 or higher & npm
+Scientific provenance is a core design principle of OceanGuard.
 
-### 2. Backend Setup
+The system operates with a strict separation between:
+
+### `REAL_DATA_MODE`
+
+Used for real-world investigation inputs.
+
+Synthetic fallback data is disabled.
+
+Missing real inputs result in explicit errors rather than silently generating replacement data.
+
+The mode prevents access to:
+
+* Synthetic SAR rasters
+* Synthetic environmental fields
+* Synthetic AIS candidates
+* Synthetic scenario defaults
+* Default incident coordinates
+
+### `SYNTHETIC_BENCHMARK_MODE`
+
+Used for:
+
+* Development
+* Regression testing
+* Algorithm evaluation
+* Demonstration
+* Controlled scenario generation
+
+Synthetic results are explicitly labelled as:
+
+```text
+[SYNTHETIC BENCHMARK]
+```
+
+This prevents benchmark performance from being presented as real-world validation.
+
+---
+
+## 📊 Evaluation & Benchmarking
+
+OceanGuard includes a parameterized synthetic benchmark runner containing **50 independently generated scenarios**.
+
+The evaluation framework calculates:
+
+* Precision
+* Recall
+* F1 Score
+* Intersection-over-Union (IoU)
+* Mean Reciprocal Rank (MRR)
+
+Benchmark metrics are calculated dynamically at runtime rather than being hard-coded marketing statistics.
+
+### Important limitation
+
+These metrics currently represent performance on **synthetic benchmark scenarios**.
+
+They should not be interpreted as validated performance on operational Sentinel-1 imagery or real-world oil-spill incidents.
+
+---
+
+## 📋 Data Provenance
+
+OceanGuard tracks the origin and classification of major outputs.
+
+| Output                 | Method                                   | Classification          |
+| ---------------------- | ---------------------------------------- | ----------------------- |
+| Slick Geometry         | Backscatter anomaly + contour extraction | `[DERIVED/HEURISTIC]`   |
+| Look-Alike Probability | Geometric/radiometric features           | `[DERIVED/HEURISTIC]`   |
+| Backward Drift         | Lagrangian particle simulation           | `[DERIVED/HEURISTIC]`   |
+| Source Region          | Particle-cloud geometry                  | `[DERIVED/HEURISTIC]`   |
+| Release Window         | Backward drift estimation                | `[DERIVED/HEURISTIC]`   |
+| Vessel Ranking         | Multi-factor evidence model              | `[DERIVED/HEURISTIC]`   |
+| Counterfactual IoU     | Shapely polygon geometry                 | `[DERIVED/HEURISTIC]`   |
+| Benchmark Metrics      | 50 synthetic scenarios                   | `[SYNTHETIC BENCHMARK]` |
+
+This distinction is intentional: **derived estimates are not presented as raw observations.**
+
+---
+
+## 🏗️ System Architecture
+
+```text
+                    ┌─────────────────────┐
+                    │   SAR Satellite     │
+                    │      Imagery        │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │   SAR Detection     │
+                    │ HEURISTIC_BASELINE  │
+                    └──────────┬──────────┘
+                               │
+                         Slick Polygon
+                               │
+                               ▼
+              ┌────────────────────────────────┐
+              │       Drift Engine             │
+              │  Lagrangian Particle Ensemble  │
+              └───────────────┬────────────────┘
+                              │
+                    Probable Source Region
+                              │
+                              ▼
+              ┌────────────────────────────────┐
+              │       AIS Correlation          │
+              │  Spatial + Temporal Filtering  │
+              └───────────────┬────────────────┘
+                              │
+                     Candidate Vessels
+                              │
+                              ▼
+              ┌────────────────────────────────┐
+              │    Attribution Engine          │
+              │   Explainable Evidence Model   │
+              └───────────────┬────────────────┘
+                              │
+                              ▼
+              ┌────────────────────────────────┐
+              │    Counterfactual Validation   │
+              │        Polygon IoU             │
+              └───────────────┬────────────────┘
+                              │
+                              ▼
+                  ┌──────────────────────┐
+                  │ Investigation Dossier│
+                  │ JSON + HTML Report    │
+                  └──────────────────────┘
+```
+
+---
+
+## 🏗️ Technology Stack
+
+| Layer                 | Technology                              |
+| --------------------- | --------------------------------------- |
+| Frontend              | React 19, Vite, TypeScript              |
+| Styling               | Tailwind CSS                            |
+| Mapping               | Leaflet                                 |
+| Charts                | Recharts                                |
+| Backend               | Python, FastAPI                         |
+| Numerical Processing  | NumPy, SciPy                            |
+| Geospatial Processing | Shapely                                 |
+| Database              | SQLite                                  |
+| Data Validation       | Pydantic                                |
+| Environmental Data    | NetCDF provider architecture            |
+| AIS                   | MarineCadastre-compatible CSV ingestion |
+| SAR                   | GeoTIFF/SAR processing pipeline         |
+
+---
+
+## 🖥️ Application Modules
+
+The frontend provides an investigation-oriented interface including:
+
+* **Landing** — system overview and mission context
+* **Dashboard** — investigation status and analysis overview
+* **Live Map** — geospatial vessel and incident visualization
+* **Vessels** — candidate vessel analysis and evidence
+* **Investigation Console** — detailed investigation workflow
+* **Simulation** — controlled scenario execution
+* **Evaluation** — benchmark and model evaluation
+* **Reports** — investigation dossier generation
+
+---
+
+## 💾 Persistence
+
+OceanGuard uses SQLite as the application persistence layer.
+
+Analysis results, investigations and relevant application state are designed to survive backend restarts rather than relying exclusively on in-memory state.
+
+---
+
+## 📄 Investigation Reports
+
+The backend provides report-generation endpoints capable of producing investigation dossiers in:
+
+* JSON
+* HTML
+
+Reports preserve the distinction between:
+
+```text
+Observed Input
+      ↓
+Derived Analysis
+      ↓
+Heuristic Evidence
+      ↓
+Candidate Ranking
+```
+
+This helps investigators understand how a result was produced.
+
+---
+
+# 🚀 Quick Start
+
+## Prerequisites
+
+* Python 3.10+
+* Node.js 18+
+* npm
+
+---
+
+## 1. Clone the repository
+
 ```bash
-cd OceanGuard/backend
-python -m venv venv
-# On Windows:
-venv\Scripts\activate
-# On Linux/macOS:
-source venv/bin/activate
+git clone https://github.com/shaurya212121/OceanGuard.git
+cd OceanGuard
+```
 
+---
+
+## 2. Start the Backend
+
+```bash
+cd backend
 pip install -r requirements.txt
 python run.py
 ```
-*Backend API service starts at `http://localhost:8000` (Swagger docs available at `http://localhost:8000/docs`).*
 
-### 3. Frontend Setup
+Backend:
+
+```text
+http://localhost:8000
+```
+
+API documentation:
+
+```text
+http://localhost:8000/docs
+```
+
+---
+
+## 3. Start the Frontend
+
+Open another terminal:
+
 ```bash
-cd OceanGuard/frontend
+cd frontend
 npm install
 npm run dev
 ```
-*Frontend dev server starts at `http://localhost:5173`.*
 
-### 4. Running Automated Unit Tests
-```bash
-cd OceanGuard
-python backend/tests/run_all_tests.py
+Frontend:
+
+```text
+http://localhost:5173
 ```
 
 ---
 
-## 📊 Evaluation & Benchmark
+## 4. Windows One-Click Start
 
-Run empirical benchmark evaluations via the frontend **Evaluation** tab or via API endpoint `/api/evaluation/run-benchmark`. Metrics returned:
-- **SAR Segmentation Precision / Recall / F1 / IoU**
-- **Attribution Top-1 / Top-3 Accuracy**
-- **Drift Origin Error (km)**
-- **Mean Counterfactual IoU**
+From the project root:
 
----
-
-## ⚠️ Prototype Limitations & Future Roadmap
-
-1. **Heuristic Look-Alike Classifier Baseline**: The current SAR classification uses feature-based rules (texture variance, area, edge sharpness). Integration with a fine-tuned UNet/ResNet trained on Sentinel-1 SNOD (Satellite Oil Spill Dataset) is planned for production.
-2. **Current & Wind Forcing Grids**: Uses uniform ocean current and wind vectors across the spatial domain. Integration with Copernicus Marine Environment Monitoring Service (CMEMS) 3D hydrodynamic models and ERA5 atmospheric reanalysis grids is recommended for operational deployment.
-3. **AIS Data Ingestion**: Supports real CSV/JSON AIS feeds; production deployment should connect directly to real-time NMEA/AIS receiver streams or commercial providers (e.g. Spire / MarineTraffic APIs).
+```bash
+start_all.bat
+```
 
 ---
 
-## 📜 License & Acknowledgments
+# 📁 Project Structure
 
-Built for **Smart India Hackathon 2026**.  
-Designed with commitment to data transparency, legal accuracy, and open scientific baselines.
+```text
+OceanGuard/
+│
+├── backend/
+│   ├── app/
+│   │   ├── routes/
+│   │   │   ├── analysis.py
+│   │   │   ├── dashboard.py
+│   │   │   ├── evaluation.py
+│   │   │   ├── reports.py
+│   │   │   └── scenarios.py
+│   │   │
+│   │   ├── services/
+│   │   │   ├── ais_loader.py
+│   │   │   ├── attribution_engine.py
+│   │   │   ├── data_generator.py
+│   │   │   ├── drift_engine.py
+│   │   │   ├── environmental_provider.py
+│   │   │   ├── evaluation.py
+│   │   │   ├── job_runner.py
+│   │   │   └── sar_pipeline.py
+│   │   │
+│   │   ├── config.py
+│   │   ├── database.py
+│   │   ├── main.py
+│   │   └── models.py
+│   │
+│   ├── data/
+│   │   └── sample_ais.csv
+│   │
+│   ├── tests/
+│   ├── requirements.txt
+│   └── run.py
+│
+├── frontend/
+│   ├── src/
+│   │   ├── api/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   │   ├── Dashboard.tsx
+│   │   │   ├── Evaluation.tsx
+│   │   │   ├── Investigation.tsx
+│   │   │   ├── InvestigationConsole.tsx
+│   │   │   ├── Landing.tsx
+│   │   │   ├── LiveMap.tsx
+│   │   │   ├── Simulation.tsx
+│   │   │   └── Vessels.tsx
+│   │   └── types/
+│   │
+│   ├── package.json
+│   └── vite.config.ts
+│
+├── start_all.bat
+└── README.md
+```
+
+---
+
+# 🧪 Validation Status
+
+The current implementation has undergone automated engineering validation covering:
+
+* Real-data mode isolation
+* Synthetic-data isolation
+* Database persistence
+* AIS filtering
+* Attribution scoring
+* Counterfactual calculations
+* Benchmark execution
+* Report generation
+* Frontend build
+
+The current automated suite reports:
+
+```text
+6 / 6 test suites passed
+```
+
+### Real-world integration status
+
+The complete real-data pipeline is **not yet independently validated** because genuine operational datasets are not currently included in the repository.
+
+The following inputs are required for a complete real-data demonstration:
+
+```text
+✓ OceanGuard pipeline
+✓ REAL_DATA_MODE
+✓ GeoTIFF ingestion architecture
+✓ NetCDF environmental provider
+✓ MarineCadastre AIS parser
+✓ Attribution engine
+✓ Counterfactual validation
+
+⚠ Genuine Sentinel-1 GeoTIFF
+⚠ Genuine environmental NetCDF/GRIB dataset
+⚠ Genuine MarineCadastre AIS dataset
+⚠ Trained SAR segmentation weights
+```
+
+Therefore, synthetic benchmark results must not be presented as real-world accuracy.
+
+---
+
+# 🔮 Future Work
+
+### 1. Trained SAR Segmentation Model
+
+Replace or augment `HEURISTIC_BASELINE_V1` with a validated segmentation model trained on appropriately labelled Sentinel-1 oil-spill imagery.
+
+Potential future architecture:
+
+```text
+Sentinel-1 SAR
+      ↓
+Preprocessing
+      ↓
+Deep Segmentation Model
+      ↓
+Oil Slick Mask
+      ↓
+Look-Alike Classification
+```
+
+### 2. Real Environmental Data Integration
+
+Integrate operational oceanographic and meteorological datasets containing spatial and temporal variation in:
+
+* Ocean currents
+* Wind fields
+* Wave/environmental conditions
+
+### 3. Real AIS Case Studies
+
+Validate vessel attribution against genuine MarineCadastre AIS datasets and documented spill incidents.
+
+### 4. Larger Independent Evaluation
+
+Build a reproducible real-world evaluation dataset with:
+
+* Known spill locations
+* Known observation times
+* Independent ground truth
+* AIS tracks
+* Environmental forcing
+* Annotated slick masks
+
+This would allow genuine scientific performance metrics to be reported.
+
+---
+
+# ⚠️ Scientific & Legal Disclaimer
+
+OceanGuard AI is a **decision-support and research prototype**.
+
+Its outputs—including:
+
+* Oil-spill detection
+* Source-region estimation
+* Release-time estimation
+* Vessel rankings
+* Attribution scores
+* Counterfactual similarity
+
+are computationally derived estimates.
+
+A vessel ranking **does not establish that a vessel caused a spill**, and the system should not be used as the sole basis for legal, regulatory, enforcement, or financial action.
+
+Independent investigation and corroborating evidence are required.
+
+---
+
+# 👥 Team
+
+Built for:
+
+**Smart India Hackathon 2026**
+
+**Problem Statement:** `SIH26143 — Marine Oil Spill Detection & Vessel Attribution`
+
+---
+
+## 🎯 Project Vision
+
+OceanGuard AI aims to transform marine oil-spill investigation from a fragmented manual process into a reproducible geospatial workflow:
+
+```text
+Observe
+   ↓
+Detect
+   ↓
+Model
+   ↓
+Trace
+   ↓
+Correlate
+   ↓
+Rank
+   ↓
+Validate
+   ↓
+Investigate
+```
+
+**From satellite observation to evidence-based vessel attribution.**
