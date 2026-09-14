@@ -6,3 +6,13 @@ numpy>=1.26.0
 scipy>=1.12.0
 shapely>=2.0.0
 python-multipart>=0.0.9
+
+# Module 1: CV oil spill detection
+Pillow>=10.0.0
+scikit-image>=0.22.0
+
+# Optional: only required to run the trained U-Net path (segmentation.py
+# auto-falls-back to classical thresholding if this isn't installed or no
+# checkpoint is present at backend/app/services/cv/weights/).
+# CPU-only install: pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch>=2.2.0
