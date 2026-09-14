@@ -35,21 +35,24 @@ export default function Investigation() {
 
   const backwardPath = drift.backward_path.map(p => [p.lat, p.lon] as [number, number]);
   const forwardPath = drift.forward_path.map(p => [p.lat, p.lon] as [number, number]);
-  const sortedSuspects = [...suspects].sort((a, b) => b.guilt_score - a.guilt_score);
+  const sortedSuspects = [...suspects].sort((a, b) => b.attribution_evidence_score - a.attribution_evidence_score);
 
   return (
     <div className="h-full flex flex-col gap-6">
       <div className="flex justify-between items-center bg-navy-900 border border-line p-4 rounded-xl">
         <div>
-          <div className="text-sm text-text-muted mb-1 font-mono">INCIDENT: {spill.id}</div>
+          <div className="text-sm text-text-muted mb-1 font-mono">INCIDENT ID: {spill.id}</div>
           <h2 className="text-2xl font-bold">{spill.name}</h2>
         </div>
         <div className="flex items-center gap-4">
           <SeverityBadge severity={spill.severity} />
           <StatusBadge status={spill.status} />
-          <div className="text-sm text-text-muted bg-navy-950 px-3 py-1.5 rounded border border-line">
-            Detected: {new Date(spill.detected_at).toLocaleString()}
-          </div>
+          <button
+            onClick={() => alert(`Exporting Official SIH 2026 Investigation Dossier for incident ${spill.id}...`)}
+            className="bg-ocean/20 hover:bg-ocean/30 text-ocean border border-ocean px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase transition-all cursor-pointer"
+          >
+            Export Dossier
+          </button>
         </div>
       </div>
 
@@ -66,10 +69,10 @@ export default function Investigation() {
               {spill.polygon_coords && spill.polygon_coords.length > 0 && (
                 <Polygon positions={spill.polygon_coords as [number, number][]} pathOptions={{ color: spill.severity === 'critical' ? '#FF2A5F' : '#00F0FF', fillColor: spill.severity === 'critical' ? '#FF2A5F' : '#00F0FF', fillOpacity: 0.15, weight: 1 }} />
               )}
-              <Polyline positions={backwardPath} pathOptions={{ color: '#00F0FF', dashArray: '5, 5', weight: 1 }} />
-              <Polyline positions={forwardPath} pathOptions={{ color: '#0EA5E9', weight: 1 }} />
-              <CircleMarker center={[drift.origin_estimate.lat, drift.origin_estimate.lon]} radius={4} pathOptions={{ color: '#00F0FF', fillColor: '#00F0FF', fillOpacity: 1, weight: 1 }} />
-              <CircleMarker center={[spill.center_lat, spill.center_lon]} radius={4} pathOptions={{ color: spill.severity === 'critical' ? '#FF2A5F' : '#00F0FF', fillColor: spill.severity === 'critical' ? '#FF2A5F' : '#00F0FF', fillOpacity: 1, weight: 1 }} />
+              <Polyline positions={backwardPath} pathOptions={{ color: '#00F0FF', dashArray: '5, 5', weight: 1.5 }} />
+              <Polyline positions={forwardPath} pathOptions={{ color: '#0EA5E9', weight: 1.5 }} />
+              <CircleMarker center={[drift.origin_estimate.lat, drift.origin_estimate.lon]} radius={5} pathOptions={{ color: '#FF2A5F', fillColor: '#FF2A5F', fillOpacity: 1, weight: 1.5 }} />
+              <CircleMarker center={[spill.center_lat, spill.center_lon]} radius={5} pathOptions={{ color: spill.severity === 'critical' ? '#FF2A5F' : '#00F0FF', fillColor: spill.severity === 'critical' ? '#FF2A5F' : '#00F0FF', fillOpacity: 1, weight: 1.5 }} />
             </MapContainer>
           </div>
         </GlassCard>
@@ -97,26 +100,26 @@ export default function Investigation() {
             <h3 className="font-bold text-lg mb-4">Suspect Vessels</h3>
             <div className="space-y-4">
               {sortedSuspects.map(suspect => (
-                <div key={suspect.imo_number} className="bg-navy-950 p-3 rounded-lg border border-line">
+                <div key={suspect.mmsi} className="bg-navy-950 p-3 rounded-lg border border-line">
                   <div className="flex justify-between items-start mb-2">
                     <div>
                       <div className="font-bold text-text">{suspect.name}</div>
-                      <div className="text-xs text-text-muted font-mono">{suspect.imo_number} | {suspect.vessel_type} | {suspect.flag_country}</div>
+                      <div className="text-xs text-text-muted font-mono">MMSI: {suspect.mmsi} {suspect.imo_number ? `| ${suspect.imo_number}` : ''} | {suspect.vessel_type}</div>
                     </div>
                     <div className="text-right">
-                      <div className={`text-xl font-bold ${suspect.guilt_score > 70 ? 'text-danger' : 'text-warning'}`}>{Math.round(suspect.guilt_score)}%</div>
-                      <div className="text-[10px] text-text-muted uppercase">Guilt Score</div>
+                      <div className={`text-xl font-bold ${suspect.attribution_evidence_score > 70 ? 'text-danger' : 'text-warning'}`}>{Math.round(suspect.attribution_evidence_score)}%</div>
+                      <div className="text-[10px] text-text-muted uppercase">Evidence Score</div>
                     </div>
                   </div>
-                  <GuiltScoreBar score={suspect.guilt_score} />
+                  <GuiltScoreBar score={suspect.attribution_evidence_score} />
                   <div className="mt-3 text-xs text-text-dim space-y-1">
-                    {suspect.had_ais_gap && (
+                    {suspect.had_relevant_ais_gap && (
                       <div className="flex items-center gap-1 text-danger">• AIS Gap detected near origin time</div>
                     )}
-                    {suspect.had_speed_drop && (
+                    {suspect.had_relevant_speed_drop && (
                       <div className="flex items-center gap-1 text-warning">• Sudden speed drop detected</div>
                     )}
-                    {suspect.reasons.map((reason, idx) => (
+                    {suspect.evidence_breakdown?.reasons?.map((reason: string, idx: number) => (
                       <div key={idx} className="flex items-center gap-1 text-text-muted">• {reason}</div>
                     ))}
                   </div>
