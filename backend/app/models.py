@@ -74,3 +74,36 @@ class Alert(BaseModel):
     timestamp: datetime
     message: str
     severity: str
+
+# --- Module 1: CV oil spill detection (two-stage hybrid pipeline) ---
+
+class SpillRegionResult(BaseModel):
+    polygon_latlon: Optional[List[List[float]]] = None
+    polygon_px: List[List[float]]
+    area_sq_km: Optional[float] = None
+    perimeter_km: Optional[float] = None
+    centroid_lat: Optional[float] = None
+    centroid_lon: Optional[float] = None
+
+class AgeEstimateResult(BaseModel):
+    fragmentation_index: Optional[float] = None  # None/NaN when no regions were detected
+    num_fragments: int
+    bucket: str  # "fresh" | "intermediate" | "weathered" | "unknown"
+    note: str
+
+class SpillDetectionResponse(BaseModel):
+    spill_detected: bool  # overall verdict after both stages
+    mode: str  # segmentation mode ("unet"/"classical"), or "<classification_mode>_negative" if Stage 2 never ran
+    confidence: float  # Stage 2 segmentation confidence (0 if Stage 2 never ran)
+    classification_mode: str  # "cnn" or "heuristic" - Stage 1
+    classification_confidence: float  # max spill probability seen across screened patches
+    patches_screened: int
+    patches_flagged: int  # patches Stage 1 handed to Stage 2
+    total_area_sq_km: float
+    primary_centroid_lat: Optional[float] = None
+    primary_centroid_lon: Optional[float] = None
+    primary_polygon_latlon: Optional[List[List[float]]] = None
+    primary_polygon_px: Optional[List[List[float]]] = None
+    regions: List[SpillRegionResult]
+    age: AgeEstimateResult
+    overlay_png_base64: str

@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import CORS_ORIGINS
-from .routes import scenarios, dashboard, vessels, analysis
+from .routes import scenarios, dashboard, vessels, analysis, detection
 from .services.data_generator import init_global_state
 
 app = FastAPI(
@@ -40,3 +40,4 @@ app.include_router(scenarios.router, prefix="/api/v1/scenarios", tags=["scenario
 app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["dashboard"])
 app.include_router(vessels.router, prefix="/api/v1/vessels", tags=["vessels"])
 app.include_router(analysis.router, prefix="/api/v1/analysis", tags=["analysis"])
+app.include_router(detection.router, prefix="/api/v1/detection", tags=["detection"])
