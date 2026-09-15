@@ -182,17 +182,39 @@ export async function fetchSpillById(spillId: string): Promise<SpillWithSuspects
 }
 
 export async function fetchVessels(): Promise<Vessel[]> {
-  const { data, error } = await supabase
-    .from('vessels')
-    .select('*, vessel_positions(lat, lon, speed_knots, heading, timestamp)')
-    .order('name', { ascending: true });
+  const [vesselsRes, suspectsRes] = await Promise.all([
+    supabase
+      .from('vessels')
+      .select('*, vessel_positions(lat, lon, speed_knots, heading, timestamp)')
+      .order('name', { ascending: true }),
+    supabase
+      .from('suspect_vessels')
+      .select('mmsi, guilt_score')
+  ]);
 
-  if (error) throw error;
+  if (vesselsRes.error) throw vesselsRes.error;
   
-  return (data || []).map((v: any) => {
+  const suspectsMap = new Map();
+  if (suspectsRes.data) {
+    for (const s of suspectsRes.data) {
+      if (!suspectsMap.has(s.mmsi) || suspectsMap.get(s.mmsi) < s.guilt_score) {
+        suspectsMap.set(s.mmsi, s.guilt_score);
+      }
+    }
+  }
+  
+  return (vesselsRes.data || []).map((v: any) => {
     let positions = v.vessel_positions || [];
     positions.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     const latestPos = positions[0] || { lat: 0, lon: 0, speed_knots: 0, heading: 0, timestamp: new Date().toISOString() };
+    
+    let risk = 'LOW';
+    if (suspectsMap.has(v.mmsi)) {
+      const score = suspectsMap.get(v.mmsi);
+      if (score >= 80) risk = 'CRITICAL';
+      else if (score >= 50) risk = 'HIGH';
+      else risk = 'MEDIUM';
+    }
     
     return {
       ...v,
@@ -206,7 +228,7 @@ export async function fetchVessels(): Promise<Vessel[]> {
       cog: latestPos.heading,
       length: null,
       draft: null,
-      risk: 'LOW',
+      risk: risk as RiskLevel,
       imo: v.imo_number,
       callsign: null,
       last_seen: latestPos.timestamp
