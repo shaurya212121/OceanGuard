@@ -234,7 +234,7 @@ export default function InvestigationsDesk() {
               ref={(m) => { if (m) mapRef.current = m; }}
               zoomControl={false}
             >
-              <TileLayer url={tileLayer.url} attribution={tileLayer.attribution} maxZoom={tileLayer.maxZoom} maxNativeZoom={tileLayer.maxNativeZoom} />
+              <TileLayer url={tileLayer.url} attribution={tileLayer.attribution} maxZoom={tileLayer.maxZoom} maxNativeZoom={tileLayer.maxNativeZoom} className={tileLayer.className} />
               <ZoomControl position="bottomright" />
 
               {/* Spill polygon */}
