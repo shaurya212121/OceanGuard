@@ -28,7 +28,6 @@ from __future__ import annotations
 import argparse
 import os
 import time
-
 import numpy as np
 
 try:
@@ -39,25 +38,13 @@ except ImportError as e:
     raise ImportError("PyTorch is required for training. pip install torch") from e
 
 from .classifier import SpillClassifierNet
-from .classification_dataset import OilSpillClassificationDataset
-
-
-def compute_class_weights(dataset: OilSpillClassificationDataset, num_classes: int) -> torch.Tensor:
-    counts = np.zeros(num_classes, dtype=np.float64)
-    for i in range(len(dataset)):
-        _, label = dataset[i]
-        counts[int(label.item())] += 1
-    counts = np.clip(counts, 1, None)
-    freq = counts / counts.sum()
-    weights = 1.0 / (freq + 1e-6)
-    weights = weights / weights.sum() * num_classes
-    return torch.tensor(weights, dtype=torch.float32)
+from .csiro_dataset import CSIRODataset
 
 
 def evaluate(model, loader, device):
     model.eval()
     correct = total = 0
-    tp = fp = fn = 0
+    tp = fp = fn = tn = 0
     with torch.no_grad():
         for imgs, labels in loader:
             imgs, labels = imgs.to(device), labels.to(device)
@@ -67,48 +54,38 @@ def evaluate(model, loader, device):
             tp += int(((preds == 1) & (labels == 1)).sum().item())
             fp += int(((preds == 1) & (labels == 0)).sum().item())
             fn += int(((preds == 0) & (labels == 1)).sum().item())
+            tn += int(((preds == 0) & (labels == 0)).sum().item())
+            
     accuracy = correct / total if total else float("nan")
-    precision = tp / (tp + fp) if (tp + fp) else float("nan")
-    recall = tp / (tp + fn) if (tp + fn) else float("nan")
-    return accuracy, precision, recall
+    precision = tp / (tp + fp) if (tp + fp) else 0.0
+    recall = tp / (tp + fn) if (tp + fn) else 0.0
+    return accuracy, precision, recall, tp, fp, fn, tn
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data-root", required=True, help="Path to the dataset root (see dataset.py docstring)")
-    parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--data-root", required=True, help="Path to the CSIRO dataset root (where Class_0 and Class_1 are)")
+    parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--image-size", type=int, default=128)
     parser.add_argument("--base-channels", type=int, default=16)
-    parser.add_argument("--min-oil-fraction", type=float, default=0.01,
-                         help="Fraction of oil-class pixels in the mask above which a chip is labeled positive")
-    parser.add_argument("--masks-are-indexed", action="store_true")
     parser.add_argument("--out", default=os.path.join(os.path.dirname(__file__), "weights", "classifier_oilspill.pt"))
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
 
     device = torch.device(args.device)
 
-    train_ds = OilSpillClassificationDataset(
-        args.data_root, split="train", image_size=args.image_size,
-        min_oil_fraction=args.min_oil_fraction, masks_are_indexed=args.masks_are_indexed,
-    )
-    try:
-        val_ds = OilSpillClassificationDataset(
-            args.data_root, split="test", image_size=args.image_size,
-            min_oil_fraction=args.min_oil_fraction, masks_are_indexed=args.masks_are_indexed,
-        )
-    except (FileNotFoundError, RuntimeError):
-        val_ds = None
+    train_ds = CSIRODataset(args.data_root, split="train", image_size=args.image_size)
+    val_ds = CSIRODataset(args.data_root, split="val", image_size=args.image_size)
 
-    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, num_workers=2)
-    val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False) if val_ds else None
+    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, num_workers=0)
+    val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, num_workers=0)
 
     model = SpillClassifierNet(in_channels=1, base_channels=args.base_channels, num_classes=2).to(device)
 
-    print("Computing class weights (handles the same oil/no-oil imbalance as the segmenter)...")
-    class_weights = compute_class_weights(train_ds, 2).to(device)
+    print("Using class weights for imbalance from train_ds...")
+    class_weights = train_ds.weights.to(device)
     print(f"Class weights: {class_weights.tolist()}")
 
     criterion = nn.CrossEntropyLoss(weight=class_weights)
@@ -129,6 +106,7 @@ def main():
             loss.backward()
             optimizer.step()
             running_loss += loss.item() * imgs.size(0)
+            
         train_loss = running_loss / len(train_ds)
         msg = f"Epoch {epoch}/{args.epochs}  train_loss={train_loss:.4f}  ({time.time()-t0:.1f}s)"
 
@@ -139,28 +117,22 @@ def main():
             "num_classes": 2,
         }
 
-        if val_loader is not None:
-            accuracy, precision, recall = evaluate(model, val_loader, device)
-            msg += f"  val_acc={accuracy:.3f}  precision={precision:.3f}  recall={recall:.3f}"
-            if accuracy > best_val_acc:
-                best_val_acc = accuracy
-                torch.save(checkpoint, args.out)
-                msg += "  [saved best]"
+        accuracy, precision, recall, tp, fp, fn, tn = evaluate(model, val_loader, device)
+        msg += f"  val_acc={accuracy:.3f}  precision={precision:.3f}  recall={recall:.3f}"
+        if accuracy > best_val_acc:
+            best_val_acc = accuracy
+            torch.save(checkpoint, args.out)
+            msg += "  [saved best]"
 
         print(msg)
+        
+        if epoch == args.epochs:
+            print("\nFinal Confusion Matrix on Validation Set:")
+            print(f"               Predicted Positive | Predicted Negative")
+            print(f"Actual Positive |       TP: {tp:<5} |       FN: {fn:<5}")
+            print(f"Actual Negative |       FP: {fp:<5} |       TN: {tn:<5}")
 
-    if val_loader is None:
-        # No val split - just save the final model
-        torch.save(
-            {
-                "model_state_dict": model.state_dict(),
-                "base_channels": args.base_channels,
-                "image_size": args.image_size,
-                "num_classes": 2,
-            },
-            args.out,
-        )
-    print(f"Done. Checkpoint saved to {args.out}")
+    print(f"\nDone. Checkpoint saved to {args.out}")
 
 
 if __name__ == "__main__":

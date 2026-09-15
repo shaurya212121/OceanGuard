@@ -1,104 +1,276 @@
-import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
-import { ShieldAlert, Ship, Waves, BellRing } from 'lucide-react';
-import { fetchDashboardStats, fetchRecentSpills, fetchAlerts, fetchScenarios } from '../api/client';
-import { StatCard, GlassCard, SeverityBadge, AlertItem } from '../components/ui';
-import { DashboardStats, Spill, Alert, ScenarioListItem } from '../types';
-import { Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { MapContainer, TileLayer, Polygon, CircleMarker, Tooltip } from 'react-leaflet';
+import L from 'leaflet';
+import { Droplets, Search, Ship, AlertTriangle, TrendingUp, Clock, ArrowRight, Loader2 } from 'lucide-react';
+import { fetchSpills, fetchVessels, fetchAlerts, type OilSpill, type Vessel, type Alert } from '@/lib/db';
+import { getTileLayer } from '@/components/map/MapLayers';
+
+const criticalSpillColor = '#FF2A5F';
+const standardSpillColor = '#00F0FF';
+
+function KpiCard({
+  icon: Icon, label, value, sub, accent, code,
+}: {
+  icon: React.ElementType; label: string; value: string | number; sub: string; accent: string; code: string;
+}) {
+  return (
+    <div className="tactical-corners p-4 flex flex-col gap-3 hover:border-ocean-cyan/40 transition-colors duration-200">
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-2">
+          <Icon size={16} strokeWidth={1.5} style={{ color: accent }} />
+          <span className="font-mono text-[10px] text-ocean-text-muted tracking-widest">{label}</span>
+        </div>
+        <span className="font-mono text-[9px] text-ocean-text-muted">{code}</span>
+      </div>
+      <div>
+        <p className="font-mono text-3xl font-medium text-ocean-text tabular-nums">{value}</p>
+        <p className="font-mono text-[10px] text-ocean-text-dim mt-1">{sub}</p>
+      </div>
+    </div>
+  );
+}
 
 export default function Dashboard() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [spills, setSpills] = useState<Spill[]>([]);
+  const navigate = useNavigate();
+  const mapRef = useRef<L.Map | null>(null);
+  const [spills, setSpills] = useState<OilSpill[]>([]);
+  const [vessels, setVessels] = useState<Vessel[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [scenarios, setScenarios] = useState<ScenarioListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchDashboardStats().then(setStats);
-    fetchRecentSpills().then(setSpills);
-    fetchAlerts().then(setAlerts);
-    fetchScenarios().then(setScenarios);
+    (async () => {
+      try {
+        const [spillData, vesselData, alertData] = await Promise.all([
+          fetchSpills(),
+          fetchVessels(),
+          fetchAlerts(),
+        ]);
+        setSpills(spillData);
+        setVessels(vesselData);
+        setAlerts(alertData);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load data');
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
-  const scenarioMap = new Map(scenarios.map((s) => [s.name, s.id]));
+  useEffect(() => {
+    if (mapRef.current) {
+      setTimeout(() => mapRef.current?.invalidateSize(), 100);
+    }
+  }, [loading]);
+
+  const tileLayer = getTileLayer('dark');
+
+  const activeSpills = spills.filter((s) => s.status === 'ACTIVE' || s.status === 'MONITORING').length;
+  const criticalAlerts = alerts.filter((a) => a.severity === 'CRITICAL').length;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 size={24} className="animate-spin text-ocean-cyan" />
+        <span className="font-mono text-sm text-ocean-text-dim ml-3">LOADING SURVEILLANCE DATA...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="tactical-corners p-6 max-w-md">
+          <p className="font-mono text-sm text-ocean-red mb-2">[ DATA LINK ERROR ]</p>
+          <p className="font-sans text-sm text-ocean-text-dim">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Total Spills" value={stats?.total_spills || 0} icon={<Waves />} trend="+1 this week" />
-        <StatCard title="Active Investigations" value={stats?.active_investigations || 0} icon={<ShieldAlert />} />
-        <StatCard title="Vessels Tracked" value={stats?.vessels_tracked || 0} icon={<Ship />} />
-        <StatCard title="Alerts Today" value={stats?.alerts_today || 0} icon={<BellRing />} />
+    <div className="p-6 space-y-6">
+      {/* Header Row */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-sans text-xl font-semibold text-ocean-text tracking-wide">Operational Overview</h2>
+          <p className="font-mono text-[11px] text-ocean-text-muted mt-1">
+            [ REAL-TIME MARITIME SURVEILLANCE GRID ] — GULF REGION — SECTOR 1-9
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="status-badge text-ocean-green border-ocean-green/40 bg-ocean-green/5">
+            <span className="w-1.5 h-1.5 bg-ocean-green rounded-full blink" />
+            LIVE FEED
+          </div>
+          <div className="status-badge text-ocean-cyan border-ocean-cyan/40 bg-ocean-cyan/5">
+            {vessels.length.toLocaleString()} VESSELS
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[500px]">
-        <GlassCard className="lg:col-span-2 relative z-0 flex flex-col">
-          <div className="p-4 border-b border-line flex justify-between items-center">
-            <h3 className="font-bold text-lg">Live Tactical Map</h3>
-            <Link to="/map" className="text-sm text-ocean hover:underline">View Full Map</Link>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard icon={Droplets} label="TOTAL SPILLS" value={spills.length} sub={`${activeSpills} ACTIVE / ${spills.length - activeSpills} MONITORED`} accent={criticalSpillColor} code="SP-01" />
+        <KpiCard icon={Search} label="ACTIVE INVESTIGATIONS" value={activeSpills} sub={`${alerts.filter(a => a.type === 'VESSEL_FLAGGED').length} SUSPECTS FLAGGED`} accent="#0EA5E9" code="INV-02" />
+        <KpiCard icon={Ship} label="VESSELS TRACKED" value={vessels.length.toLocaleString()} sub={`${vessels.length} AIS POSITIONS`} accent="#00F0FF" code="VES-03" />
+        <KpiCard icon={AlertTriangle} label="CRITICAL ALERTS" value={criticalAlerts} sub="REQUIRES IMMEDIATE ACTION" accent={criticalSpillColor} code="ALT-04" />
+      </div>
+
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Mini Tactical Map */}
+        <div className="lg:col-span-2 tactical-corners p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[10px] text-ocean-text-muted tracking-widest">TACTICAL MAP</span>
+              <span className="font-mono text-[10px] text-ocean-cyan">[ GULF REGION ]</span>
+            </div>
+            <button
+              onClick={() => navigate('/map')}
+              className="flex items-center gap-1 font-mono text-[10px] text-ocean-cyan hover:text-ocean-text tracking-wider"
+            >
+              EXPAND <ArrowRight size={10} strokeWidth={2} />
+            </button>
           </div>
-          <div className="flex-1 bg-navy-950">
-            <MapContainer center={[14.5, 75.1]} zoom={6} className="h-full w-full" zoomControl={false}>
-              <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}" />
-              <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}" />
-              {spills.map(spill => (
-                <CircleMarker 
-                  key={spill.id} 
-                  center={[spill.center_lat, spill.center_lon]} 
-                  radius={5}
-                  pathOptions={{ color: spill.severity === 'critical' ? '#FF2A5F' : '#00F0FF', fillColor: spill.severity === 'critical' ? '#FF2A5F' : '#00F0FF', fillOpacity: 0.8, weight: 1 }}
+          <div className="h-80 border border-ocean-border relative">
+            <MapContainer
+              center={[25.2, 55.5]}
+              zoom={6}
+              className="w-full h-full"
+              ref={(m) => { if (m) mapRef.current = m; }}
+              zoomControl={false}
+            >
+              <TileLayer url={tileLayer.url} attribution={tileLayer.attribution} maxZoom={tileLayer.maxZoom} />
+
+              {/* Plot spills */}
+              {spills.map((spill) => {
+                const color = spill.severity === 'CRITICAL' ? criticalSpillColor : standardSpillColor;
+                return (
+                  <Polygon
+                    key={spill.id}
+                    positions={spill.polygon}
+                    pathOptions={{ color, fillColor: color, fillOpacity: 0.15, weight: 1 }}
+                  >
+                    <Tooltip>
+                      <div className="font-mono text-[10px]">
+                        <div className="text-ocean-cyan font-bold">{spill.spill_id}</div>
+                        <div>{spill.name}</div>
+                        <div>{spill.area_km2} km² — {spill.severity}</div>
+                      </div>
+                    </Tooltip>
+                  </Polygon>
+                );
+              })}
+
+              {/* Plot some vessels */}
+              {vessels.slice(0, 15).map((v) => (
+                <CircleMarker
+                  key={v.id}
+                  center={[v.lat, v.lng]}
+                  radius={3}
+                  pathOptions={{
+                    color: v.risk === 'CRITICAL' ? criticalSpillColor : '#00F0FF',
+                    fillColor: v.risk === 'CRITICAL' ? criticalSpillColor : '#00F0FF',
+                    fillOpacity: 1,
+                    weight: 1,
+                  }}
                 >
-                  <Popup className="custom-popup">
-                    <div className="text-navy-950 font-bold">{spill.name}</div>
-                    <div className="text-xs text-navy-800">Area: {spill.area_sq_km} km²</div>
-                  </Popup>
+                  <Tooltip>
+                    <div className="font-mono text-[10px]">
+                      <div className="text-ocean-cyan font-bold">{v.mmsi}</div>
+                      <div>{v.name}</div>
+                      <div>{v.type}</div>
+                    </div>
+                  </Tooltip>
                 </CircleMarker>
               ))}
             </MapContainer>
           </div>
-        </GlassCard>
+          {/* Legend */}
+          <div className="flex items-center gap-4 mt-3">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 bg-ocean-red rounded-full" />
+              <span className="font-mono text-[9px] text-ocean-text-dim">CRITICAL SPILL</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 bg-ocean-cyan rounded-full" />
+              <span className="font-mono text-[9px] text-ocean-text-dim">STANDARD SPILL</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 bg-ocean-cyan rounded-full" />
+              <span className="font-mono text-[9px] text-ocean-text-dim">VESSEL</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 bg-ocean-red rounded-full" />
+              <span className="font-mono text-[9px] text-ocean-text-dim">SUSPECT VESSEL</span>
+            </div>
+          </div>
+        </div>
 
-        <GlassCard className="flex flex-col">
-          <div className="p-4 border-b border-line">
-            <h3 className="font-bold text-lg">Recent Alerts</h3>
+        {/* Alert Feed */}
+        <div className="tactical-corners p-4 flex flex-col">
+          <div className="flex items-center justify-between mb-3">
+            <span className="font-mono text-[10px] text-ocean-text-muted tracking-widest">LIVE ALERT FEED</span>
+            <span className="font-mono text-[10px] text-ocean-red pulse-red">[ {alerts.length} NEW ]</span>
           </div>
-          <div className="flex-1 overflow-auto p-2">
-            {alerts.map(alert => <AlertItem key={alert.id} alert={alert} />)}
+          <div className="flex-1 space-y-2 overflow-y-auto max-h-80">
+            {alerts.slice(0, 7).map((alert) => {
+              const sevColor =
+                alert.severity === 'CRITICAL' ? 'text-ocean-red border-ocean-red/40' :
+                alert.severity === 'HIGH' ? 'text-ocean-amber border-ocean-amber/40' :
+                alert.severity === 'MODERATE' ? 'text-ocean-sky border-ocean-sky/40' :
+                'text-ocean-text-muted border-ocean-border';
+              return (
+                <div
+                  key={alert.id}
+                  className="border border-ocean-border p-3 hover:border-ocean-cyan/30 transition-colors duration-150 cursor-pointer"
+                  onClick={() => alert.spill_id && navigate('/investigations')}
+                >
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className={`status-badge ${sevColor}`}>{alert.severity}</span>
+                    <span className="font-mono text-[9px] text-ocean-text-muted">
+                      {alert.timestamp.slice(11, 19)}Z
+                    </span>
+                  </div>
+                  <p className="font-sans text-xs text-ocean-text font-medium leading-snug">{alert.title}</p>
+                  <p className="font-sans text-[11px] text-ocean-text-dim mt-0.5 leading-snug line-clamp-2">{alert.description}</p>
+                </div>
+              );
+            })}
           </div>
-        </GlassCard>
+        </div>
       </div>
 
-      <GlassCard className="p-4">
-        <h3 className="font-bold text-lg mb-4">Active Investigations</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-line text-text-muted text-sm">
-                <th className="pb-3 pr-4">ID</th>
-                <th className="pb-3 pr-4">Name</th>
-                <th className="pb-3 pr-4">Severity</th>
-                <th className="pb-3 pr-4">Detected</th>
-                <th className="pb-3 pr-4">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {spills.map(spill => {
-                const scenarioId = scenarioMap.get(spill.name) || spill.id;
-                return (
-                  <tr key={spill.id} className="border-b border-line last:border-0">
-                    <td className="py-3 font-mono text-sm">{spill.id}</td>
-                    <td className="py-3 font-medium">{spill.name}</td>
-                    <td className="py-3"><SeverityBadge severity={spill.severity} /></td>
-                    <td className="py-3 font-mono text-sm text-text-muted">{new Date(spill.detected_at).toLocaleDateString()}</td>
-                    <td className="py-3">
-                      <Link to={`/investigation/${scenarioId}`} className="text-ocean hover:text-ocean-light text-sm font-medium">Investigate →</Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      {/* Bottom Stats Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="tactical-corners p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp size={14} strokeWidth={1.5} className="text-ocean-cyan" />
+            <span className="font-mono text-[10px] text-ocean-text-muted tracking-widest">RESOLUTION RATE</span>
+          </div>
+          <p className="font-mono text-2xl text-ocean-text">87.3<span className="text-ocean-text-dim text-base">%</span></p>
+          <p className="font-mono text-[10px] text-ocean-green mt-1">↑ 2.1% FROM LAST WEEK</p>
         </div>
-      </GlassCard>
+        <div className="tactical-corners p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Clock size={14} strokeWidth={1.5} className="text-ocean-cyan" />
+            <span className="font-mono text-[10px] text-ocean-text-muted tracking-widest">AVG RESPONSE TIME</span>
+          </div>
+          <p className="font-mono text-2xl text-ocean-text">4h 12m</p>
+          <p className="font-mono text-[10px] text-ocean-amber mt-1">↓ 18m FROM LAST WEEK</p>
+        </div>
+        <div className="tactical-corners p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Droplets size={14} strokeWidth={1.5} className="text-ocean-cyan" />
+            <span className="font-mono text-[10px] text-ocean-text-muted tracking-widest">TOTAL AREA MONITORED</span>
+          </div>
+          <p className="font-mono text-2xl text-ocean-text">2.4M<span className="text-ocean-text-dim text-base"> km²</span></p>
+          <p className="font-mono text-[10px] text-ocean-text-dim mt-1">9 SECTORS / 4 REGIONS</p>
+        </div>
+      </div>
     </div>
   );
 }

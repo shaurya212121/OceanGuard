@@ -1,26 +1,23 @@
-import React from 'react';
-import { Routes, Route } from 'react-router-dom';
-import { AppLayout } from './components/layout';
-import Landing from './pages/Landing';
-import Dashboard from './pages/Dashboard';
-import LiveMap from './pages/LiveMap';
-import Investigation from './pages/Investigation';
-import Vessels from './pages/Vessels';
-import Reports from './pages/Reports';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Layout from '@/components/layout/Layout';
+import Dashboard from '@/pages/Dashboard';
+import LiveTacticalMap from '@/pages/LiveTacticalMap';
+import InvestigationsDesk from '@/pages/InvestigationsDesk';
+import VesselsRegistry from '@/pages/VesselsRegistry';
+import AnalyticsReports from '@/pages/AnalyticsReports';
 
-function App() {
+export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Landing />} />
-      <Route element={<AppLayout />}>
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/map" element={<LiveMap />} />
-        <Route path="/investigation/:id" element={<Investigation />} />
-        <Route path="/vessels" element={<Vessels />} />
-        <Route path="/reports" element={<Reports />} />
-      </Route>
-    </Routes>
+    <BrowserRouter>
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/map" element={<LiveTacticalMap />} />
+          <Route path="/investigations" element={<InvestigationsDesk />} />
+          <Route path="/vessels" element={<VesselsRegistry />} />
+          <Route path="/analytics" element={<AnalyticsReports />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }
-
-export default App;
