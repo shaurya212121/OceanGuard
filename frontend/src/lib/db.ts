@@ -7,7 +7,8 @@ export type SpillStatus = 'ACTIVE' | 'MONITORING' | 'CONTAINED' | 'RESOLVED';
 export type VesselType =
   | 'Crude Oil Tanker' | 'Chemical Tanker' | 'Container Ship'
   | 'Bulk Carrier' | 'LNG Tanker' | 'Product Tanker'
-  | 'Fishing Vessel' | 'General Cargo';
+  | 'Fishing Vessel' | 'General Cargo'
+  | 'Cargo' | 'Tanker' | 'Fishing' | 'Container' | string;
 export type RiskLevel = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 export type AlertType = 'SPILL_DETECTED' | 'VESSEL_FLAGGED' | 'SAT_LINK' | 'SYSTEM' | 'TRAJECTORY';
 export type DriftDirection = 'BACKWARD' | 'FORWARD';

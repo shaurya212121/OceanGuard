@@ -8,6 +8,7 @@ import { tileLayers, getTileLayer } from '@/components/map/MapLayers';
 const vesselTypes: VesselType[] = [
   'Crude Oil Tanker', 'Chemical Tanker', 'Container Ship', 'Bulk Carrier',
   'LNG Tanker', 'Product Tanker', 'General Cargo',
+  'Cargo', 'Tanker', 'Fishing', 'Container'
 ];
 
 const riskLevels: RiskLevel[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
