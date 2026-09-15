@@ -13,7 +13,7 @@ router = APIRouter()
 
 @router.post("/detect-spill", response_model=SpillDetectionResponse)
 async def detect_spill(
-    image: UploadFile = File(..., description="SAR or EO image chip (PNG/JPEG)"),
+    image: UploadFile = File(..., description="SAR or EO image - a small chip, or a large scene (PNG/JPEG)"),
     pixel_size_m: float = Form(10.0, description="Meters per pixel, e.g. Sentinel-1 GRD IW ~10m"),
     already_calibrated: bool = Form(True, description="False if raw linear-power SAR needs dB conversion"),
     speckle_method: str = Form("lee", description="'lee' or 'median'"),
@@ -22,23 +22,33 @@ async def detect_spill(
     bottom_right_lat: Optional[float] = Form(None),
     bottom_right_lon: Optional[float] = Form(None),
     min_area_px: int = Form(30, description="Discard regions smaller than this many pixels"),
+    patch_size: int = Form(512, description="Stage 1 screens the image in patches this large (px); scenes at or below this size are screened whole"),
+    patch_overlap: int = Form(32, description="Overlap (px) between adjacent patches, so a slick straddling a patch boundary isn't missed"),
+    classification_threshold: float = Form(0.5, description="Stage 1 spill-probability threshold above which a patch is passed to Stage 2 segmentation"),
+    force_segmentation: bool = Form(False, description="Bypass the Stage 1 gate and run Stage 2 on every patch regardless (debugging / known-positive chips)"),
 ):
     """
-    Module 1: Detect and characterise oil spill(s) in an uploaded SAR/EO image.
+    Module 1: Two-stage hybrid detection of oil spill(s) in an uploaded SAR/EO image.
 
-    Returns segmented region polygon(s), area, centroid, perimeter, a
-    fragmentation-based age heuristic, and a visual overlay. If the four
-    georeferencing corner params are supplied, geometry is returned in real
-    lat/lon + km; otherwise it's in pixel space (scaled by pixel_size_m).
+    Stage 1 (classification/screening) rapidly screens the image - or,
+    for scenes larger than `patch_size`, each patch of it - for the
+    likely presence of a slick. Only patches that pass Stage 1 are handed
+    to Stage 2 (pixel-wise segmentation), which extracts precise
+    boundaries, area, centroid, perimeter, and a fragmentation-based age
+    heuristic. Patches that screen negative in Stage 1 never reach the
+    (much more expensive) segmentation model.
 
-    Automatically uses a trained U-Net if a checkpoint is present at
-    backend/app/services/cv/weights/unet_oilspill.pt, otherwise falls back
-    to classical adaptive-threshold + morphology segmentation.
+    Both stages auto-upgrade from lightweight fallbacks (heuristic
+    screening / classical adaptive thresholding) to trained models the
+    moment checkpoints are present at:
+      backend/app/services/cv/weights/classifier_oilspill.pt   (Stage 1)
+      backend/app/services/cv/weights/unet_oilspill.pt          (Stage 2)
+    - no route/service code changes needed either way.
+
+    If the four georeferencing corner params are supplied, geometry is
+    returned in real lat/lon + km; otherwise it's in pixel space (scaled
+    by pixel_size_m).
     """
-    if image.content_type not in ("image/png", "image/jpeg", "image/jpg", "image/tiff", None):
-        # Some clients don't set content_type reliably; don't hard-block, just warn via 415 only for clearly wrong types
-        pass
-
     image_bytes = await image.read()
     if not image_bytes:
         raise HTTPException(status_code=400, detail="Empty file upload")
@@ -54,13 +64,22 @@ async def detect_spill(
             bottom_right_lat=bottom_right_lat,
             bottom_right_lon=bottom_right_lon,
             min_area_px=min_area_px,
+            patch_size=patch_size,
+            patch_overlap=patch_overlap,
+            classification_threshold=classification_threshold,
+            force_segmentation=force_segmentation,
         )
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Detection failed: {e}")
 
     return SpillDetectionResponse(
+        spill_detected=result.spill_detected,
         mode=result.mode,
         confidence=result.confidence,
+        classification_mode=result.classification_mode,
+        classification_confidence=result.classification_confidence,
+        patches_screened=result.patches_screened,
+        patches_flagged=result.patches_flagged,
         total_area_sq_km=result.total_area_sq_km or 0.0,
         primary_centroid_lat=result.primary_centroid_lat,
         primary_centroid_lon=result.primary_centroid_lon,
