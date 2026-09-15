@@ -1,57 +1,181 @@
-@import 'tailwindcss';
-@import 'leaflet/dist/leaflet.css';
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-@theme {
-  --color-bg: #030C14; /* Deep Ocean Navy */
-  --color-panel: #0A1929; /* Slightly lighter navy for panels */
-  --color-text-main: #E0F2FE; /* Crisp icy blue/white */
-  --color-ocean: #00F0FF; /* Bright Cyan for all primary accents */
-  --color-teal: #0EA5E9; /* Sky blue for secondary info */
-  --color-danger: #FF2A5F; /* Neon pink/red for critical */
-  --color-success: #00FFAA; /* Mint for resolved */
-  --color-hairline: #1E3A8A; /* Soft blue hairline borders */
-
-  /* Aliases to map existing classes to new theme */
-  --color-navy-950: var(--color-bg);
-  --color-navy-900: var(--color-panel);
-  --color-navy-800: #132943;
-  --color-navy-700: #1E3A5F;
-  --color-navy-600: var(--color-hairline);
-  
-  --color-ocean-light: #7DF8FF;
-  --color-ocean-glow: var(--color-ocean);
-  
-  --color-spill: var(--color-ocean); 
-  --color-spill-dark: #008994;
-  
-  --color-warning: #FFB100;
-  --color-safe: var(--color-success);
-  
-  --color-text: var(--color-text-main);
-  --color-text-muted: #94A3B8;
-  --color-text-dim: #475569;
-  --color-line: var(--color-hairline);
-
-  --font-sans: 'Space Grotesk', system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', monospace;
+@layer base {
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    background-color: #030C14;
+    color: #E0F2FE;
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
 }
 
-body {
-  background-color: var(--color-bg);
-  color: var(--color-text-main);
-  font-family: var(--font-sans);
+@layer components {
+  /* Tactical panel with corner bezel tick-marks */
+  .tactical-panel {
+    position: relative;
+    background-color: #0A1929;
+    border: 1px solid #1E3A8A;
+  }
+  .tactical-panel::before,
+  .tactical-panel::after {
+    content: '';
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-color: #00F0FF;
+    border-style: solid;
+    pointer-events: none;
+  }
+  .tactical-panel::before {
+    top: -1px;
+    left: -1px;
+    border-width: 1px 0 0 1px;
+  }
+  .tactical-panel::after {
+    bottom: -1px;
+    right: -1px;
+    border-width: 0 1px 1px 0;
+  }
+
+  .tactical-panel-full::before,
+  .tactical-panel-full::after {
+    content: '';
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-color: #00F0FF;
+    border-style: solid;
+    pointer-events: none;
+  }
+
+  /* All four corners */
+  .tactical-corners {
+    position: relative;
+  background-color: #0A1929;
+    border: 1px solid #1E3A8A;
+  overflow: visible;
+  }
+  .tactical-corners::before,
+  .tactical-corners::after {
+    content: '';
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-color: #00F0FF;
+    border-style: solid;
+    pointer-events: none;
+  }
+  .tactical-corners::before {
+    top: -1px;
+    left: -1px;
+    border-width: 1px 0 0 1px;
+  }
+  .tactical-corners::after {
+    bottom: -1px;
+    right: -1px;
+    border-width: 0 1px 1px 0;
+  }
+
+  /* Status badge — bracketed tag style */
+  .status-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    padding: 2px 8px;
+    border: 1px solid;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* Hairline divider */
+  .hairline {
+    border-color: #1E3A8A;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #030C14;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #1E3A8A;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #1E40AF;
+  }
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--color-bg); }
-::-webkit-scrollbar-thumb { background: var(--color-hairline); }
-::-webkit-scrollbar-thumb:hover { background: var(--color-ocean); }
+/* Leaflet dark theme overrides */
+.leaflet-container {
+  background-color: #030C14 !important;
+  font-family: 'IBM Plex Mono', monospace !important;
+}
+.leaflet-control-zoom a {
+  background-color: #0A1929 !important;
+  color: #E0F2FE !important;
+  border-color: #1E3A8A !important;
+}
+.leaflet-control-zoom a:hover {
+  background-color: #0F2138 !important;
+  border-color: #00F0FF !important;
+}
+.leaflet-control-attribution {
+  background-color: rgba(3, 12, 20, 0.8) !important;
+  color: #475569 !important;
+}
+.leaflet-control-attribution a {
+  color: #7DD3FC !important;
+}
+.leaflet-popup-content-wrapper {
+  background-color: #0A1929 !important;
+  color: #E0F2FE !important;
+  border: 1px solid #1E3A8A !important;
+  border-radius: 0 !important;
+}
+.leaflet-popup-tip {
+  background-color: #0A1929 !important;
+  border: 1px solid #1E3A8A !important;
+}
 
-/* Leaflet dark theme override */
-.leaflet-container { background: var(--color-bg) !important; font-family: inherit; }
-.leaflet-tile-pane { filter: brightness(0.7) contrast(1.2) saturate(0.8) hue-rotate(180deg); } /* Shifts the dark gray map to a deep blue tint */
-.leaflet-control-zoom { border: 1px solid var(--color-hairline) !important; border-radius: 0 !important; }
-.leaflet-control-zoom a { background: var(--color-panel) !important; color: var(--color-text-main) !important; border: none !important; border-radius: 0 !important; }
-.leaflet-control-zoom a:hover { background: var(--color-navy-800) !important; color: var(--color-ocean) !important; }
+/* Custom vessel marker */
+.vessel-marker {
+  width: 10px;
+  height: 10px;
+  background-color: #00F0FF;
+  border: 1px solid #030C14;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(0, 240, 255, 0.6);
+}
+.vessel-marker-suspect {
+  background-color: #FF2A5F;
+  box-shadow: 0 0 8px rgba(255, 42, 95, 0.7);
+}
+
+/* Pulse animation for critical alerts */
+@keyframes pulse-red {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.pulse-red {
+  animation: pulse-red 1.5s ease-in-out infinite;
+}
+
+/* Blinking dot */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+.blink {
+  animation: blink 2s ease-in-out infinite;
+}
