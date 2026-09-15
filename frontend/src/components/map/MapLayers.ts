@@ -6,6 +6,7 @@ export interface TileLayerConfig {
   url: string;
   attribution: string;
   maxZoom: number;
+  maxNativeZoom?: number;
 }
 
 export const tileLayers: TileLayerConfig[] = [
@@ -21,7 +22,8 @@ export const tileLayers: TileLayerConfig[] = [
     label: 'Ocean Bathymetry',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}',
     attribution: '&copy; Esri, GEBCO, NOAA',
-    maxZoom: 13,
+    maxZoom: 19,
+    maxNativeZoom: 13,
   },
   {
     id: 'satellite',
@@ -29,6 +31,7 @@ export const tileLayers: TileLayerConfig[] = [
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attribution: '&copy; Esri, Maxar, Earthstar Geographics',
     maxZoom: 19,
+    maxNativeZoom: 17,
   },
 ];
 

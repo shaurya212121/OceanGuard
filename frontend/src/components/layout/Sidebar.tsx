@@ -1,3 +1,4 @@
+import metrics from '@/data/metrics.json';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Radar, Search, Ship, BarChart3, Settings, ShieldCheck, ChevronRight } from 'lucide-react';
 
@@ -66,7 +67,7 @@ export default function Sidebar() {
             </div>
             <div className="flex items-center justify-between">
               <span className="font-mono text-[10px] text-ocean-text-dim">ML MODEL</span>
-              <span className="font-mono text-[10px] text-ocean-amber">[ 96.2% ]</span>
+              <span className="font-mono text-[10px] text-ocean-amber">[ {(metrics.accuracy * 100).toFixed(1)}% ]</span>
             </div>
           </div>
         </div>

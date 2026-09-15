@@ -103,6 +103,7 @@ export default function LiveTacticalMap() {
             url={tileLayer.url}
             attribution={tileLayer.attribution}
             maxZoom={tileLayer.maxZoom}
+            maxNativeZoom={tileLayer.maxNativeZoom}
           />
           <ZoomControl position="bottomright" />
 
