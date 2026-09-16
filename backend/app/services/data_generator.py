@@ -210,7 +210,11 @@ def generate_all_data() -> Dict[str, Any]:
     vessels.append(guilty_vessel)
     
     # Load real AIS data if available
-    csv_path = os.path.join(os.path.dirname(__file__), '../../data/sample_ais.csv')
+    real_csv_path = os.path.join(os.path.dirname(__file__), '../../data/real_ais_export.csv')
+    sample_csv_path = os.path.join(os.path.dirname(__file__), '../../data/sample_ais.csv')
+    
+    csv_path = real_csv_path if os.path.exists(real_csv_path) else sample_csv_path
+    
     if os.path.exists(csv_path):
         from .ais_loader import load_ais_csv
         try:

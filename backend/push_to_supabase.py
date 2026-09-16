@@ -56,7 +56,7 @@ for img_path in image_paths:
         bottom_right_lat=br_lat,
         bottom_right_lon=br_lon,
         pixel_size_m=10.0,
-        classification_threshold=0.5
+        classification_threshold=0.55
     )
     
     if res.spill_detected and res.primary_polygon_latlon:

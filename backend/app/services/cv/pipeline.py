@@ -105,7 +105,7 @@ def detect_oil_spill(
     min_area_px: int = 30,
     patch_size: int = 512,
     patch_overlap: int = 32,
-    classification_threshold: float = 0.5,
+    classification_threshold: float = 0.55,
     force_segmentation: bool = False,
 ) -> DetectionResult:
     """Run the full two-stage Module 1 pipeline on a raw SAR/EO image file's bytes.

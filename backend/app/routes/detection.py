@@ -24,7 +24,7 @@ async def detect_spill(
     min_area_px: int = Form(30, description="Discard regions smaller than this many pixels"),
     patch_size: int = Form(512, description="Stage 1 screens the image in patches this large (px); scenes at or below this size are screened whole"),
     patch_overlap: int = Form(32, description="Overlap (px) between adjacent patches, so a slick straddling a patch boundary isn't missed"),
-    classification_threshold: float = Form(0.5, description="Stage 1 spill-probability threshold above which a patch is passed to Stage 2 segmentation"),
+    classification_threshold: float = Form(0.55, description="Stage 1 spill-probability threshold above which a patch is passed to Stage 2 segmentation"),
     force_segmentation: bool = Form(False, description="Bypass the Stage 1 gate and run Stage 2 on every patch regardless (debugging / known-positive chips)"),
 ):
     """
