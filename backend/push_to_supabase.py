@@ -20,6 +20,7 @@ from app.models import OilSpill, VesselTrack, VesselPosition
 from app.services.data_generator import generate_vessels
 from app.services.drift_simulator import simulate_drift
 from app.services.vessel_scorer import score_vessels
+from app.services.ecological_threats import check_ecological_threats
 
 # ---------------------------------------------------------------------------
 # Guilty vessel generator — creates a vessel whose track deliberately passes
@@ -257,14 +258,21 @@ for spill, drift in zip(spills, drifts):
         supabase.table("suspect_vessels").upsert(s_dict).execute()
     print(f"  Spill {spill.id[:8]}.. -> {len(suspects)} suspects (scores: {[s.guilt_score for s in suspects]})")
     total_suspects += len(suspects)
-
+    
+    # Ecological Threat Check
+    alerts = check_ecological_threats(spill.id, drift, base_time)
+    for alert in alerts:
+        a_dict = alert.model_dump(mode="json")
+        supabase.table("alerts").upsert(a_dict).execute()
+        print(f"  -> Generated Alert: {alert.message}")
+        
 # ---------------------------------------------------------------------------
 # Final row counts
 # ---------------------------------------------------------------------------
 print("\n" + "=" * 50)
 print("FINAL TABLE ROW COUNTS")
 print("=" * 50)
-for table in ["oil_spills", "drift_paths", "suspect_vessels", "vessels", "vessel_positions"]:
+for table in ["oil_spills", "drift_paths", "suspect_vessels", "vessels", "vessel_positions", "alerts"]:
     rows = supabase.table(table).select("*").execute().data
     print(f"  {table:<20} | {len(rows)}")
 print("=" * 50)
