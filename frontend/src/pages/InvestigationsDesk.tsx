@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Polygon, Polyline, CircleMarker, Marker, Tooltip, ZoomControl } from 'react-leaflet';
+import { MapContainer, TileLayer, Polygon, Polyline, CircleMarker, Circle, Marker, Tooltip, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import { Search, Crosshair, Navigation, Target, FileText, Clock, MapPin, Loader2, AlertTriangle } from 'lucide-react';
 import { fetchSpills, fetchSpillById, type OilSpill, type SpillWithSuspects } from '@/lib/db';
