@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Polygon, Polyline, CircleMarker, Marker, Tooltip, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
-import { Search, Crosshair, Navigation, Target, FileText, Clock, MapPin, Loader2 } from 'lucide-react';
+import { Search, Crosshair, Navigation, Target, FileText, Clock, MapPin, Loader2, AlertTriangle } from 'lucide-react';
 import { fetchSpills, fetchSpillById, type OilSpill, type SpillWithSuspects } from '@/lib/db';
 import { getTileLayer, createOriginMarker } from '@/components/map/MapLayers';
 
@@ -193,6 +193,22 @@ export default function InvestigationsDesk() {
               </p>
             </div>
             <div className="flex items-center gap-4">
+              {selectedSpill.metadata && (
+                <>
+                  <div className="text-right">
+                    <p className="font-mono text-[10px] text-ocean-text-muted">AGE</p>
+                    <p className="font-mono text-lg text-ocean-text capitalize">{selectedSpill.metadata.age}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-mono text-[10px] text-ocean-text-muted">WIND</p>
+                    <p className="font-mono text-lg text-ocean-text">{selectedSpill.metadata.wind_speed}<span className="text-ocean-text-dim text-sm"> m/s</span></p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-mono text-[10px] text-ocean-text-muted">CONF</p>
+                    <p className={`font-mono text-lg ${selectedSpill.metadata.confidence === 'low' ? 'text-ocean-amber' : 'text-ocean-cyan'} uppercase`}>{selectedSpill.metadata.confidence}</p>
+                  </div>
+                </>
+              )}
               <div className="text-right">
                 <p className="font-mono text-[10px] text-ocean-text-muted">AREA</p>
                 <p className="font-mono text-lg text-ocean-text">{selectedSpill.area_km2}<span className="text-ocean-text-dim text-sm"> km²</span></p>
@@ -203,6 +219,12 @@ export default function InvestigationsDesk() {
               </div>
             </div>
           </div>
+          {selectedSpill.metadata?.confidence_note && (
+            <div className="mt-3 p-2 bg-ocean-amber/10 border border-ocean-amber/30 rounded text-ocean-amber font-mono text-xs flex items-center gap-2">
+              <AlertTriangle size={14} />
+              {selectedSpill.metadata.confidence_note}
+            </div>
+          )}
         </div>
 
         {/* Map + Suspect Panel */}
@@ -218,11 +240,13 @@ export default function InvestigationsDesk() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-4 h-0.5 bg-ocean-amber" style={{ borderTop: '1px dashed #FBBF24' }} />
-                  <span className="font-mono text-[9px] text-ocean-text-dim">FORWARD DRIFT</span>
+                  <span className="font-mono text-[9px] text-ocean-text-dim">FORWARD PROJECTION</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Crosshair size={10} strokeWidth={1.5} className="text-ocean-cyan" />
-                  <span className="font-mono text-[9px] text-ocean-text-dim">ORIGIN POINT</span>
+                <div className="flex items-center gap-2 mt-2">
+                  <div className="w-4 h-4 rounded-full bg-ocean-cyan/20 border border-ocean-cyan/40 flex items-center justify-center">
+                    <div className="w-1 h-1 rounded-full bg-ocean-cyan" />
+                  </div>
+                  <span className="font-mono text-[9px] text-ocean-text-dim">UNCERTAINTY CONE</span>
                 </div>
               </div>
             </div>
@@ -268,6 +292,20 @@ export default function InvestigationsDesk() {
                 radius={6}
                 pathOptions={{ color: spillColor, fillColor: spillColor, fillOpacity: 0.4, weight: 2 }}
               />
+
+              {/* Origin point (with Uncertainty Cone) */}
+              <Circle
+                center={[selectedSpill.origin_lat, selectedSpill.origin_lng]}
+                radius={Math.min((Math.abs(new Date().getTime() - new Date(selectedSpill.detected_at).getTime()) / 3600000) * 2 * 1000, 80000)}
+                pathOptions={{ color: '#00F0FF', fillColor: '#00F0FF', fillOpacity: 0.1, weight: 1, dashArray: '4 4' }}
+              >
+                <Tooltip>
+                  <div className="font-mono text-[10px]">
+                    <div className="text-ocean-cyan font-bold">Estimated origin</div>
+                    <div className="text-ocean-text-dim">Uncertainty radius grows with time since detection.</div>
+                  </div>
+                </Tooltip>
+              </Circle>
 
               {/* Origin point */}
               <Marker

@@ -13,6 +13,14 @@ export type RiskLevel = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 export type AlertType = 'SPILL_DETECTED' | 'VESSEL_FLAGGED' | 'SAT_LINK' | 'SYSTEM' | 'TRAJECTORY';
 export type DriftDirection = 'BACKWARD' | 'FORWARD';
 
+export interface SpillMetadata {
+  type: string;
+  age: string;
+  wind_speed?: number;
+  confidence?: string | number;
+  confidence_note?: string;
+}
+
 export interface OilSpill {
   id: string;
   spill_id: string;
@@ -28,6 +36,7 @@ export interface OilSpill {
   origin_lng: number;
   forward_drift_lat: number;
   forward_drift_lng: number;
+  metadata?: SpillMetadata;
 }
 
 export interface Vessel {
@@ -99,16 +108,23 @@ export async function fetchSpills(): Promise<OilSpill[]> {
 
   if (error) throw error;
   
-  return (data || []).map((spill: any) => ({
-    ...spill,
-    lat: spill.center_lat,
-    lng: spill.center_lon,
-    area_km2: spill.area_sq_km,
-    polygon: spill.polygon_coords,
-    spill_id: spill.id.substring(0, 8).toUpperCase(),
-    severity: (spill.severity || 'UNKNOWN').toUpperCase(),
-    status: (spill.status || 'UNKNOWN').toUpperCase(),
-  })) as OilSpill[];
+  return (data || []).map((spill: any) => {
+    let metadata: SpillMetadata | undefined;
+    if (spill.spill_type && spill.spill_type.startsWith('{')) {
+      try { metadata = JSON.parse(spill.spill_type); } catch(e) {}
+    }
+    return {
+      ...spill,
+      lat: spill.center_lat,
+      lng: spill.center_lon,
+      area_km2: spill.area_sq_km,
+      polygon: spill.polygon_coords,
+      spill_id: spill.id.substring(0, 8).toUpperCase(),
+      severity: (spill.severity || 'UNKNOWN').toUpperCase(),
+      status: (spill.status || 'UNKNOWN').toUpperCase(),
+      metadata,
+    };
+  }) as OilSpill[];
 }
 
 export async function fetchSpillById(spillId: string): Promise<SpillWithSuspects | null> {
@@ -120,6 +136,11 @@ export async function fetchSpillById(spillId: string): Promise<SpillWithSuspects
 
   if (spillError) throw spillError;
   if (!spill) return null;
+
+  let metadata: SpillMetadata | undefined;
+  if (spill.spill_type && spill.spill_type.startsWith('{')) {
+    try { metadata = JSON.parse(spill.spill_type); } catch(e) {}
+  }
 
   const { data: suspects, error: suspectsError } = await supabase
     .from('suspect_vessels')
@@ -163,6 +184,7 @@ export async function fetchSpillById(spillId: string): Promise<SpillWithSuspects
     spill_id: spill.id.substring(0, 8).toUpperCase(),
     severity: (spill.severity || 'UNKNOWN').toUpperCase(),
     status: (spill.status || 'UNKNOWN').toUpperCase(),
+    metadata,
     suspects: (suspects || []).map((s: any) => ({
       ...s,
       vessel_id: s.mmsi,

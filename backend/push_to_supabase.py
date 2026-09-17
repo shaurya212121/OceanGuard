@@ -153,6 +153,7 @@ coords = [
 ]
 
 spills_pushed = 0
+wind_speeds = [4.5, 2.5, 5.2, 1.8, 6.0]
 
 for img_path in image_paths:
     if spills_pushed >= 5:
@@ -175,6 +176,27 @@ for img_path in image_paths:
 
     if res.spill_detected and res.primary_polygon_latlon:
         spill_id_stable = str(uuid.uuid5(uuid.NAMESPACE_URL, f"oceanguard_{img_path.name}"))
+        
+        # Wind speed logic
+        wind_speed = wind_speeds[spills_pushed % len(wind_speeds)]
+        conf_level = "high"
+        conf_note = ""
+        if wind_speed < 3.0:
+            conf_level = "low"
+            conf_note = "Low wind conditions — possible calm-water lookalike, confidence reduced."
+        
+        # Age heuristic
+        age = res.age.bucket if res.age else "unknown"
+        
+        import json
+        spill_type_data = {
+            "type": "crude",
+            "age": age,
+            "wind_speed": wind_speed,
+            "confidence": conf_level,
+            "confidence_note": conf_note
+        }
+        
         spill = OilSpill(
             id=spill_id_stable,
             name=f"Real Detection - {img_path.name}",
@@ -182,11 +204,11 @@ for img_path in image_paths:
             center_lat=res.primary_centroid_lat,
             center_lon=res.primary_centroid_lon,
             area_sq_km=res.total_area_sq_km,
-            severity="HIGH" if res.total_area_sq_km > 2 else "MODERATE",
+            severity="HIGH" if res.total_area_sq_km > 3.0 else "MODERATE",
             status="ACTIVE",
             polygon_coords=res.primary_polygon_latlon,
-            estimated_volume_liters=res.total_area_sq_km * 1000 * 2,
-            spill_type="unknown",
+            estimated_volume_liters=res.total_area_sq_km * 1000000 * 0.1,  # arbitrary volume calc
+            spill_type=json.dumps(spill_type_data)
         )
         drift = simulate_drift(
             spill.center_lat, spill.center_lon, base_time,
