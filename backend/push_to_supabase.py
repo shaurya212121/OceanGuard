@@ -134,6 +134,7 @@ def generate_guilty_vessel_near(
 # ---------------------------------------------------------------------------
 # Main script
 # ---------------------------------------------------------------------------
+random.seed(42)
 
 class_1_dir = Path("data/csiro_dataset/kaggle/data/Class_1")
 image_paths = sorted([p for p in class_1_dir.iterdir() if p.suffix.lower() == ".jpg"])
@@ -217,12 +218,16 @@ for i, (spill, drift) in enumerate(zip(spills, drifts)):
 print(f"\nTotal vessels: {len(all_vessels)}")
 
 # ---------------------------------------------------------------------------
-# Upsert everything to Supabase
+# Upsert everything to Supabase (Idempotent)
 # ---------------------------------------------------------------------------
 print("\nUpserting spills + drift paths...")
 for spill, drift in zip(spills, drifts):
     print(f"  Upserting spill: {spill.id}")
     supabase.table("oil_spills").upsert(spill.model_dump(mode="json")).execute()
+
+    # Clear old child records to prevent duplication (since they lack UUID primary keys)
+    supabase.table("drift_paths").delete().eq("spill_id", spill.id).execute()
+    supabase.table("suspect_vessels").delete().eq("spill_id", spill.id).execute()
 
     drift_dict = drift.model_dump(mode="json")
     drift_dict["spill_id"] = spill.id
@@ -230,10 +235,13 @@ for spill, drift in zip(spills, drifts):
     drift_dict["origin_lon"] = drift_dict["origin_estimate"]["lon"]
     drift_dict["origin_timestamp"] = drift_dict["origin_estimate"]["timestamp"]
     del drift_dict["origin_estimate"]
-    supabase.table("drift_paths").upsert(drift_dict).execute()
+    supabase.table("drift_paths").insert(drift_dict).execute()
 
 print("Upserting vessels + positions...")
 for v in all_vessels:
+    # Clear old positions for this vessel to prevent duplication
+    supabase.table("vessel_positions").delete().eq("mmsi", v.mmsi).execute()
+    
     supabase.table("vessels").upsert(v.model_dump(mode="json", exclude={"positions"})).execute()
     position_batch = []
     for p in v.positions:
@@ -241,7 +249,7 @@ for v in all_vessels:
         p_dict["mmsi"] = v.mmsi
         position_batch.append(p_dict)
     if position_batch:
-        supabase.table("vessel_positions").upsert(position_batch).execute()
+        supabase.table("vessel_positions").insert(position_batch).execute()
 
 print("Scoring vessels against each spill's drift origin...")
 total_suspects = 0
@@ -255,7 +263,7 @@ for spill, drift in zip(spills, drifts):
         s_dict["spill_id"] = spill.id
         for key in ["imo_number", "name", "flag_country", "vessel_type"]:
             s_dict.pop(key, None)
-        supabase.table("suspect_vessels").upsert(s_dict).execute()
+        supabase.table("suspect_vessels").insert(s_dict).execute()
     print(f"  Spill {spill.id[:8]}.. -> {len(suspects)} suspects (scores: {[s.guilt_score for s in suspects]})")
     total_suspects += len(suspects)
     

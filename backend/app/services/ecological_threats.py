@@ -70,7 +70,7 @@ def check_ecological_threats(spill_id: str, drift: DriftPath, base_time: datetim
                 msg = f"CRITICAL: Spill {spill_id[:8]} forward drift trajectory intersects {zone['name']}. Estimated impact in {hours_to_impact:.1f} hours."
             
             alerts.append(Alert(
-                id=str(uuid.uuid4()),
+                id=str(uuid.uuid5(uuid.NAMESPACE_URL, f"{spill_id}-{zone['name']}")),
                 timestamp=base_time,
                 message=msg,
                 severity="critical"
