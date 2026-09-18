@@ -36,6 +36,7 @@ export interface OilSpill {
   origin_lng: number;
   forward_drift_lat: number;
   forward_drift_lng: number;
+  estimated_volume_liters?: number;
   metadata?: SpillMetadata;
 }
 

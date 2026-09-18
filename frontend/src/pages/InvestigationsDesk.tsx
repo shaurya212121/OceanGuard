@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Polygon, Polyline, CircleMarker, Circle, Marker, Tooltip, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
-import { Search, Crosshair, Navigation, Target, FileText, Clock, MapPin, Loader2, AlertTriangle } from 'lucide-react';
+import { Search, Crosshair, Navigation, Target, FileText, Clock, MapPin, Loader2, AlertTriangle, Download } from 'lucide-react';
 import { fetchSpills, fetchSpillById, type OilSpill, type SpillWithSuspects } from '@/lib/db';
 import { getTileLayer, createOriginMarker } from '@/components/map/MapLayers';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const tileLayer = getTileLayer('dark');
 
@@ -47,6 +49,97 @@ export default function InvestigationsDesk() {
   const [spills, setSpills] = useState<OilSpill[]>([]);
   const [selectedSpillId, setSelectedSpillId] = useState<string | null>(null);
   const [selectedSpill, setSelectedSpill] = useState<SpillWithSuspects | null>(null);
+
+  const generatePDF = () => {
+    if (!selectedSpill) return;
+    
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    
+    doc.setFont('courier', 'bold');
+    doc.setTextColor(255, 0, 0);
+    doc.text('PROTOTYPE — FOR DEMONSTRATION ONLY, NOT OPERATIONAL EVIDENCE', pageWidth / 2, 15, { align: 'center' });
+    
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(16);
+    doc.text('EVIDENCE DOSSIER: OIL SPILL INCIDENT', pageWidth / 2, 25, { align: 'center' });
+    
+    doc.setFontSize(10);
+    doc.setFont('courier', 'normal');
+    doc.text(`Generated: ${new Date().toISOString()}`, pageWidth / 2, 30, { align: 'center' });
+    
+    doc.setFontSize(12);
+    doc.setFont('courier', 'bold');
+    doc.text('1. SPILL GEOMETRY & DETAILS', 14, 45);
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(10);
+    doc.text(`Incident ID: ${selectedSpill.spill_id}`, 14, 52);
+    doc.text(`Detected At: ${new Date(selectedSpill.detected_at).toLocaleString()}`, 14, 58);
+    doc.text(`Center Coordinates: ${selectedSpill.lat.toFixed(4)}°N, ${selectedSpill.lng.toFixed(4)}°E`, 14, 64);
+    doc.text(`Area: ${selectedSpill.area_km2.toFixed(2)} sq km`, 14, 70);
+    
+    let y = 76;
+    if (selectedSpill.estimated_volume_liters) {
+        doc.text(`Estimated Volume: ${(selectedSpill.estimated_volume_liters / 1000000).toFixed(2)} ML (assumes 1mm slick thickness)`, 14, y);
+        y += 6;
+    }
+    if (selectedSpill.metadata?.wind_speed !== undefined) {
+        doc.text(`Regional Wind Speed: ${selectedSpill.metadata.wind_speed} m/s`, 14, y);
+        y += 6;
+    }
+    if (selectedSpill.metadata?.confidence) {
+        doc.text(`Detection Confidence: ${selectedSpill.metadata.confidence.toString().toUpperCase()}`, 14, y);
+        y += 6;
+    }
+    if (selectedSpill.metadata?.confidence_note) {
+        doc.setTextColor(200, 100, 0);
+        doc.text(`Note: ${selectedSpill.metadata.confidence_note}`, 14, y);
+        doc.setTextColor(0, 0, 0);
+        y += 6;
+    }
+    
+    y += 4;
+    doc.setFontSize(12);
+    doc.setFont('courier', 'bold');
+    doc.text('2. KINEMATIC DRIFT FORECAST', 14, y);
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(10);
+    y += 7;
+    doc.text(`Estimated Origin: ${selectedSpill.origin_lat.toFixed(4)}°N, ${selectedSpill.origin_lng.toFixed(4)}°E`, 14, y);
+    y += 6;
+    doc.text(`Forward Drift Trajectory: ${selectedSpill.forward_drift_lat.toFixed(4)}°N, ${selectedSpill.forward_drift_lng.toFixed(4)}°E`, 14, y);
+    y += 10;
+    
+    doc.setFontSize(12);
+    doc.setFont('courier', 'bold');
+    doc.text('3. SUSPECT VESSEL ANALYSIS', 14, y);
+    y += 5;
+    
+    if (selectedSpill.suspects && selectedSpill.suspects.length > 0) {
+      const tableData = selectedSpill.suspects.slice(0, 5).map(s => [
+        s.name, 
+        s.mmsi, 
+        s.flag || 'Unknown', 
+        s.guilt_score.toString(), 
+        s.distance_nm.toFixed(1) + ' NM'
+      ]);
+      
+      autoTable(doc, {
+        startY: y,
+        head: [['Vessel Name', 'MMSI', 'Flag', 'Guilt Score', 'Proximity to Origin']],
+        body: tableData,
+        theme: 'grid',
+        styles: { font: 'courier', fontSize: 9 },
+        headStyles: { fillColor: [0, 50, 100] }
+      });
+    } else {
+      doc.setFont('courier', 'normal');
+      doc.setFontSize(10);
+      doc.text('No suspect vessels matched within proximity threshold.', 14, y + 5);
+    }
+    
+    doc.save(`evidence_dossier_${selectedSpill.spill_id}.pdf`);
+  };
   const [loading, setLoading] = useState(true);
   const [spillLoading, setSpillLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -209,11 +302,18 @@ export default function InvestigationsDesk() {
                   </div>
                 </>
               )}
-              <div className="text-right">
-                <p className="font-mono text-[10px] text-ocean-text-muted">AREA</p>
-                <p className="font-mono text-lg text-ocean-text">{selectedSpill.area_km2}<span className="text-ocean-text-dim text-sm"> km²</span></p>
-              </div>
-              <div className="text-right">
+                <div className="text-right">
+                  <p className="font-mono text-[10px] text-ocean-text-muted">AREA</p>
+                  <p className="font-mono text-lg text-ocean-text">{selectedSpill.area_km2.toFixed(2)}<span className="text-ocean-text-dim text-sm"> km²</span></p>
+                </div>
+                <div className="text-right" title="Estimated volume (assumes uniform 1mm slick thickness) — order-of-magnitude only.">
+                  <p className="font-mono text-[10px] text-ocean-text-muted">VOLUME</p>
+                  <p className="font-mono text-lg text-ocean-text cursor-help border-b border-dashed border-ocean-text-muted">
+                    {selectedSpill.estimated_volume_liters ? (selectedSpill.estimated_volume_liters / 1_000_000).toFixed(2) : (selectedSpill.area_km2 * 1000).toFixed(2)}
+                    <span className="text-ocean-text-dim text-sm"> ML</span>
+                  </p>
+                </div>
+                <div className="text-right">
                 <p className="font-mono text-[10px] text-ocean-text-muted">SUSPECTS</p>
                 <p className="font-mono text-lg text-ocean-cyan">{selectedSpill.suspects.length}</p>
               </div>
@@ -225,6 +325,13 @@ export default function InvestigationsDesk() {
               {selectedSpill.metadata.confidence_note}
             </div>
           )}
+
+          <div className="mt-4">
+            <button onClick={generatePDF} className="w-full tactical-button py-2 bg-ocean-cyan/10 hover:bg-ocean-cyan/20 border border-ocean-cyan/30 text-ocean-cyan text-xs flex items-center justify-center gap-2">
+              <Download size={14} />
+              GENERATE PDF EVIDENCE DOSSIER
+            </button>
+          </div>
         </div>
 
         {/* Map + Suspect Panel */}

@@ -207,7 +207,7 @@ for img_path in image_paths:
             severity="HIGH" if res.total_area_sq_km > 3.0 else "MODERATE",
             status="ACTIVE",
             polygon_coords=res.primary_polygon_latlon,
-            estimated_volume_liters=res.total_area_sq_km * 1000000 * 0.1,  # arbitrary volume calc
+            estimated_volume_liters=res.total_area_sq_km * 1_000_000 * 0.001 * 1000,  # Assumed uniform 1mm thickness
             spill_type=json.dumps(spill_type_data)
         )
         drift = simulate_drift(
