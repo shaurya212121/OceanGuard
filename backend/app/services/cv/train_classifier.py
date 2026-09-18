@@ -37,7 +37,7 @@ try:
 except ImportError as e:
     raise ImportError("PyTorch is required for training. pip install torch") from e
 
-from .classifier import SpillClassifierNet
+from .classifier import SpillClassifierNet, ResNet18SpillClassifier
 from .csiro_dataset import CSIRODataset
 
 
@@ -65,24 +65,28 @@ def evaluate(model, loader, device):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-root", required=True, help="Path to the CSIRO dataset root (where Class_0 and Class_1 are)")
-    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--image-size", type=int, default=128)
     parser.add_argument("--base-channels", type=int, default=16)
-    parser.add_argument("--out", default=os.path.join(os.path.dirname(__file__), "weights", "classifier_oilspill.pt"))
+    parser.add_argument("--arch", type=str, default="resnet18", choices=["cnn", "resnet18"])
+    parser.add_argument("--out", default=os.path.join(os.path.dirname(__file__), "weights", "classifier_oilspill_v2.pt"))
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
 
     device = torch.device(args.device)
 
-    train_ds = CSIRODataset(args.data_root, split="train", image_size=args.image_size)
-    val_ds = CSIRODataset(args.data_root, split="val", image_size=args.image_size)
+    train_ds = CSIRODataset(args.data_root, split="train", image_size=args.image_size, seed=42)
+    val_ds = CSIRODataset(args.data_root, split="val", image_size=args.image_size, seed=42)
 
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, num_workers=0)
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, num_workers=0)
 
-    model = SpillClassifierNet(in_channels=1, base_channels=args.base_channels, num_classes=2).to(device)
+    if args.arch == "resnet18":
+        model = ResNet18SpillClassifier(in_channels=1, num_classes=2).to(device)
+    else:
+        model = SpillClassifierNet(in_channels=1, base_channels=args.base_channels, num_classes=2).to(device)
 
     print("Using class weights for imbalance from train_ds...")
     class_weights = train_ds.weights.to(device)
@@ -115,6 +119,7 @@ def main():
             "base_channels": args.base_channels,
             "image_size": args.image_size,
             "num_classes": 2,
+            "arch": args.arch
         }
 
         accuracy, precision, recall, tp, fp, fn, tn = evaluate(model, val_loader, device)
@@ -127,10 +132,35 @@ def main():
         print(msg)
         
         if epoch == args.epochs:
+            print("\nEvaluating best saved model for final metrics...")
+            if args.arch == "resnet18":
+                best_model = ResNet18SpillClassifier(in_channels=1, num_classes=2).to(device)
+            else:
+                best_model = SpillClassifierNet(in_channels=1, base_channels=args.base_channels, num_classes=2).to(device)
+            best_model.load_state_dict(torch.load(args.out)["model_state_dict"])
+            accuracy, precision, recall, tp, fp, fn, tn = evaluate(best_model, val_loader, device)
+            f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
+            
             print("\nFinal Confusion Matrix on Validation Set:")
             print(f"               Predicted Positive | Predicted Negative")
             print(f"Actual Positive |       TP: {tp:<5} |       FN: {fn:<5}")
             print(f"Actual Negative |       FP: {fp:<5} |       TN: {tn:<5}")
+            print(f"Accuracy: {accuracy*100:.1f}%, Precision: {precision*100:.1f}%, Recall: {recall*100:.1f}%, F1: {f1*100:.1f}%")
+            
+            import json
+            metrics = {
+                "accuracy": accuracy,
+                "precision": precision,
+                "recall": recall,
+                "f1": f1,
+                "confusion_matrix": {
+                    "tp": tp, "fp": fp, "fn": fn, "tn": tn
+                }
+            }
+            metrics_path = os.path.join(os.path.dirname(args.out), "metrics_v2.json")
+            with open(metrics_path, "w") as f:
+                json.dump(metrics, f, indent=4)
+            print(f"\nSaved best metrics to {metrics_path}")
 
     print(f"\nDone. Checkpoint saved to {args.out}")
 

@@ -63,14 +63,23 @@ class SpillClassifier:
             return
         try:
             import torch
-            from .classifier import SpillClassifierNet
+            from .classifier import SpillClassifierNet, ResNet18SpillClassifier
 
             ckpt = torch.load(self.checkpoint_path, map_location=self.device)
-            model = SpillClassifierNet(
-                in_channels=1,
-                base_channels=ckpt.get("base_channels", 16),
-                num_classes=ckpt.get("num_classes", 2),
-            )
+            arch = ckpt.get("arch", "cnn")
+            
+            if arch == "resnet18":
+                model = ResNet18SpillClassifier(
+                    in_channels=1,
+                    num_classes=ckpt.get("num_classes", 2),
+                )
+            else:
+                model = SpillClassifierNet(
+                    in_channels=1,
+                    base_channels=ckpt.get("base_channels", 16),
+                    num_classes=ckpt.get("num_classes", 2),
+                )
+                
             model.load_state_dict(ckpt["model_state_dict"])
             model.eval()
             model.to(self.device)

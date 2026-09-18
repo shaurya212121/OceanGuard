@@ -1,4 +1,4 @@
-﻿import torch
+import torch
 from torch.utils.data import Dataset
 from pathlib import Path
 from PIL import Image
@@ -8,6 +8,7 @@ class CSIRODataset(Dataset):
     def __init__(self, data_root: str, image_size: int = 128, split: str = "train", val_split_ratio: float = 0.2, seed: int = 42):
         self.data_root = Path(data_root)
         self.image_size = image_size
+        self.split = split
         
         class_0_dir = self.data_root / "Class_0"
         class_1_dir = self.data_root / "Class_1"
@@ -63,6 +64,16 @@ class CSIRODataset(Dataset):
         )
         img_arr = np.array(img, dtype=np.float32) / 255.0
         img_tensor = torch.from_numpy(img_arr).unsqueeze(0)  # (1, H, W)
+        
+        if getattr(self, "split", "") == "train":
+            import random
+            if random.random() > 0.5:
+                img_tensor = torch.flip(img_tensor, [2])
+            if random.random() > 0.5:
+                img_tensor = torch.flip(img_tensor, [1])
+            rot_k = random.randint(0, 3)
+            if rot_k > 0:
+                img_tensor = torch.rot90(img_tensor, k=rot_k, dims=[1, 2])
 
         return img_tensor, torch.tensor(label, dtype=torch.long)
 

@@ -81,3 +81,34 @@ class SpillClassifierNet(nn.Module):
 
 CLASS_NAMES = ["no_spill", "oil_spill"]
 SPILL_CLASS_IDX = 1
+
+
+class ResNet18SpillClassifier(nn.Module):
+    def __init__(self, in_channels: int = 1, num_classes: int = 2):
+        super().__init__()
+        import torchvision.models as models
+        # Load pretrained resnet18
+        weights = models.ResNet18_Weights.DEFAULT
+        self.backbone = models.resnet18(weights=weights)
+        
+        # Modify first conv layer to accept 1-channel grayscale input
+        if in_channels != 3:
+            old_conv1 = self.backbone.conv1
+            self.backbone.conv1 = nn.Conv2d(
+                in_channels,
+                old_conv1.out_channels,
+                kernel_size=old_conv1.kernel_size,
+                stride=old_conv1.stride,
+                padding=old_conv1.padding,
+                bias=False
+            )
+            # Average or sum RGB weights across channels to initialize 1-channel weights
+            with torch.no_grad():
+                self.backbone.conv1.weight.data = old_conv1.weight.data.sum(dim=1, keepdim=True)
+                
+        # Modify the fc layer
+        in_features = self.backbone.fc.in_features
+        self.backbone.fc = nn.Linear(in_features, num_classes)
+        
+    def forward(self, x):
+        return self.backbone(x)
