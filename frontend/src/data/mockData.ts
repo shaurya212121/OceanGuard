@@ -839,7 +839,7 @@ export const mockVessels: Vessel[] = [
     track_history: [[8.70, 78.40], [8.75, 78.30], [8.8000, 78.2000]],
   },
   {
-    id: 'v108', mmsi: '419111222', name: 'ICG SHAURYA', type: 'Vessel', flag: 'India', flag_code: 'IN',
+    id: 'v108', mmsi: '419111222', name: 'ICG SHAURYA', type: 'General Cargo', flag: 'India', flag_code: 'IN',
     lat: 19.2000, lng: 72.8000, sog: 22.5, cog: 290, length: 105, draft: 4.5, dwt: 2000, risk: 'LOW', risk_score: 5,
     ais_status: 'ACTIVE', last_seen: '2026-09-13T09:00:00Z', imo: '0000000', callsign: 'VWC2', in_spill_aoi: false,
     destination: 'MUMBAI PATROL', eta: '2026-09-13 23:00',
@@ -874,7 +874,7 @@ export const mockVessels: Vessel[] = [
     track_history: [[20.70, 87.70], [20.85, 87.85], [21.0000, 88.0000]],
   },
   {
-    id: 'v113', mmsi: '419777888', name: 'INS TARKASH', type: 'Vessel', flag: 'India', flag_code: 'IN',
+    id: 'v113', mmsi: '419777888', name: 'INS TARKASH', type: 'General Cargo', flag: 'India', flag_code: 'IN',
     lat: 15.4000, lng: 73.0000, sog: 18.0, cog: 330, length: 125, draft: 5.5, dwt: 4000, risk: 'LOW', risk_score: 8,
     ais_status: 'ACTIVE', last_seen: '2026-09-13T09:20:00Z', imo: '0000000', callsign: 'VWTK', in_spill_aoi: false,
     destination: 'GOA', eta: '2026-09-13 16:00',
@@ -902,7 +902,7 @@ export const mockVessels: Vessel[] = [
     track_history: [[18.50, 71.00], [18.25, 71.00], [18.0000, 71.0000]],
   },
   {
-    id: 'v117', mmsi: '419888777', name: 'SAGAR NIDHI', type: 'Vessel', flag: 'India', flag_code: 'IN',
+    id: 'v117', mmsi: '419888777', name: 'SAGAR NIDHI', type: 'General Cargo', flag: 'India', flag_code: 'IN',
     lat: 10.5000, lng: 75.2000, sog: 8.5, cog: 90, length: 104, draft: 5.5, dwt: 3000, risk: 'LOW', risk_score: 10,
     ais_status: 'ACTIVE', last_seen: '2026-09-13T09:05:00Z', imo: '9392236', callsign: 'VWSN', in_spill_aoi: false,
     destination: 'LAKSHADWEEP SEA', eta: '2026-09-15 12:00',
@@ -937,7 +937,7 @@ export const mockVessels: Vessel[] = [
     track_history: [[13.60, 81.30], [13.80, 81.40], [14.0000, 81.5000]],
   },
   {
-    id: 'v122', mmsi: '419400500', name: 'ICG VARUNA', type: 'Vessel', flag: 'India', flag_code: 'IN',
+    id: 'v122', mmsi: '419400500', name: 'ICG VARUNA', type: 'General Cargo', flag: 'India', flag_code: 'IN',
     lat: 8.5000, lng: 77.0000, sog: 20.0, cog: 90, length: 105, draft: 4.8, dwt: 2100, risk: 'LOW', risk_score: 5,
     ais_status: 'ACTIVE', last_seen: '2026-09-13T09:00:00Z', imo: '0000000', callsign: 'VWVR', in_spill_aoi: false,
     destination: 'KANYAKUMARI PATROL', eta: '2026-09-13 14:00',

@@ -26,22 +26,39 @@ import {
   Maximize2,
   Anchor,
   HelpCircle,
+  Flame,
+  Droplets,
+  Activity,
+  Waves,
+  ShieldAlert,
 } from 'lucide-react';
 import {
   fetchSpills,
   fetchVessels,
-  fetchOpenDriftParticles,
   fetchVulnerabilityZones,
   type OilSpill,
   type Vessel,
-  type OpenDriftParticle,
   type CoastalVulnerabilityZone,
   type VesselType,
   type RiskLevel,
 } from '@/lib/db';
-import { tileLayers, getTileLayer, createDirectionalVesselMarker, createOriginMarker } from '@/components/map/MapLayers';
+import {
+  tileLayers,
+  getTileLayer,
+  createDirectionalVesselMarker,
+  createOriginMarker,
+  createParticleDivIcon,
+  createStreamlineVectorIcon,
+} from '@/components/map/MapLayers';
 import TemporalDriftScrubber from '@/components/map/TemporalDriftScrubber';
 import SarInspectorModal from '@/components/map/SarInspectorModal';
+import {
+  calculateWeatheringTelemetry,
+  interpolateParticleCloud,
+  generateConcentrationContours,
+  generateEnvironmentalVectors,
+  interpolateVesselPositionAtHour,
+} from '@/utils/driftPhysics';
 import {
   formatCoordinates,
   formatArea,
@@ -49,8 +66,6 @@ import {
   formatSpeed,
   formatCourse,
   formatVolume,
-  formatLat,
-  formatLng,
   formatPercent,
 } from '@/utils/formatters';
 
@@ -78,27 +93,30 @@ export default function LiveTacticalMap() {
   const [activeBaseLayer, setActiveBaseLayer] = useState('bathymetry');
   const [showLayersMenu, setShowLayersMenu] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [selectedTypes, setSelectedTypes] = useState<Set<VesselType>>(new Set(vesselTypes));
-  const [selectedRisks, setSelectedRisks] = useState<Set<RiskLevel>>(new Set(riskLevels));
+  const [sarModalOpen, setSarModalOpen] = useState(false);
 
   // Layer Toggles
   const [showSpills, setShowSpills] = useState(true);
   const [showVessels, setShowVessels] = useState(true);
-  const [showSarOverlay, setShowSarOverlay] = useState(true);
-  const [sarOpacity, setSarOpacity] = useState(0.75);
   const [showOpenDrift, setShowOpenDrift] = useState(true);
-  const [showTrajectories, setShowTrajectories] = useState(true);
+  const [showContours, setShowContours] = useState(true);
+  const [showStreamlines, setShowStreamlines] = useState(true);
   const [showVulnerability, setShowVulnerability] = useState(true);
+  const [showTrajectories, setShowTrajectories] = useState(true);
+  const [showSarOverlay, setShowSarOverlay] = useState(true);
+  const [sarOpacity, setSarOpacity] = useState(0.65);
 
-  // 4D Temporal Scrubber state
-  const [currentHour, setCurrentHour] = useState(0); // -48 to +72
-  const [sarModalOpen, setSarModalOpen] = useState(false);
+  // Vessel Filters
+  const [selectedTypes, setSelectedTypes] = useState<Set<VesselType>>(new Set(vesselTypes));
+  const [selectedRisks, setSelectedRisks] = useState<Set<RiskLevel>>(new Set(riskLevels));
 
-  // Data
+  // Simulation Temporal Scrubber: -48.0 to +72.0 hours
+  const [currentHour, setCurrentHour] = useState<number>(0.0);
+
+  // Data State
   const [spills, setSpills] = useState<OilSpill[]>([]);
   const [selectedSpill, setSelectedSpill] = useState<OilSpill | null>(null);
   const [vessels, setVessels] = useState<Vessel[]>([]);
-  const [particles, setParticles] = useState<OpenDriftParticle[]>([]);
   const [vulnerabilityZones, setVulnerabilityZones] = useState<CoastalVulnerabilityZone[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -107,16 +125,14 @@ export default function LiveTacticalMap() {
   useEffect(() => {
     (async () => {
       try {
-        const [spillData, vesselData, particleData, zoneData] = await Promise.all([
+        const [spillData, vesselData, zoneData] = await Promise.all([
           fetchSpills(),
           fetchVessels(),
-          fetchOpenDriftParticles(),
           fetchVulnerabilityZones(),
         ]);
         setSpills(spillData);
         if (spillData.length > 0) setSelectedSpill(spillData[0]);
         setVessels(vesselData);
-        setParticles(particleData);
         setVulnerabilityZones(zoneData);
       } catch (err) {
         console.error('Failed to load tactical map data:', err);
@@ -133,72 +149,117 @@ export default function LiveTacticalMap() {
   }, [loading]);
 
   const tileLayer = getTileLayer(activeBaseLayer);
+  const primarySpill = selectedSpill || spills[0];
 
-  const toggleType = (type: VesselType) => {
-    const next = new Set(selectedTypes);
-    if (next.has(type)) next.delete(type); else next.add(type);
-    setSelectedTypes(next);
-  };
+  // Live Weathering & Hydrodynamic Telemetry
+  const weatheringTelemetry = useMemo(() => {
+    return calculateWeatheringTelemetry(
+      currentHour,
+      primarySpill?.estimated_volume_liters || 4820000,
+      primarySpill?.area_km2 || 4.82
+    );
+  }, [currentHour, primarySpill]);
 
-  const toggleRisk = (risk: RiskLevel) => {
-    const next = new Set(selectedRisks);
-    if (next.has(risk)) next.delete(risk); else next.add(risk);
-    setSelectedRisks(next);
-  };
+  // Continuous Dynamic Particle Cloud (OpenDrift / OpenOil Model)
+  const dynamicParticles = useMemo(() => {
+    if (!primarySpill) return [];
+    return interpolateParticleCloud(
+      currentHour,
+      primarySpill.origin_lat,
+      primarySpill.origin_lng,
+      primarySpill.lat,
+      primarySpill.lng,
+      primarySpill.forward_drift_lat,
+      primarySpill.forward_drift_lng,
+      110
+    );
+  }, [currentHour, primarySpill]);
 
+  // Graduated Iso-Concentration Dispersion Hulls (Core -> Sheen -> Dispersion)
+  const concentrationContours = useMemo(() => {
+    return generateConcentrationContours(dynamicParticles, currentHour);
+  }, [dynamicParticles, currentHour]);
+
+  // Environmental Streamline Vectors (Current & Wind Forcing)
+  const environmentalVectors = useMemo(() => {
+    if (!primarySpill) return [];
+    return generateEnvironmentalVectors(primarySpill.lat, primarySpill.lng);
+  }, [primarySpill]);
+
+  // Filtered vessels based on active checkboxes
   const filteredVessels = useMemo(() => {
     return vessels.filter((v) => selectedTypes.has(v.type) && selectedRisks.has(v.risk));
   }, [vessels, selectedTypes, selectedRisks]);
 
-  // Interpolate vessel positions based on currentHour scrubber (-48 to +72)
+  // Synchronize vessel positions along their tracks based on simulation hour
   const interpolatedVessels = useMemo(() => {
     return filteredVessels.map((v) => {
-      // If vessel has track history, interpolate between history and current
+      const isSuspect = v.risk === 'CRITICAL' || v.risk === 'HIGH';
+
       if (!v.track_history || v.track_history.length < 2) {
-        return { ...v, currentLat: v.lat, currentLng: v.lng };
+        return {
+          ...v,
+          currentLat: v.lat,
+          currentLng: v.lng,
+          isIntermittent: false,
+          inDischargeWindow: false,
+        };
       }
-      if (currentHour === 0) {
-        return { ...v, currentLat: v.lat, currentLng: v.lng };
+
+      // If vessel has track history, interpolate between history and current
+      if (Math.abs(currentHour) < 0.1) {
+        return {
+          ...v,
+          currentLat: v.lat,
+          currentLng: v.lng,
+          isIntermittent: false,
+          inDischargeWindow: false,
+        };
       }
+
       if (currentHour < 0) {
-        // Look back into past track
+        // Backtrack along recorded track
         const ratio = Math.max(0, 1 + currentHour / 48); // 0 at -48h, 1 at 0h
         const ptStart = v.track_history[0];
         const ptEnd = [v.lat, v.lng];
         const lat = ptStart[0] + (ptEnd[0] - ptStart[0]) * ratio;
         const lng = ptStart[1] + (ptEnd[1] - ptStart[1]) * ratio;
-        return { ...v, currentLat: lat, currentLng: lng };
+
+        // Check if vessel is in discharge release window (-48h to -36h) near origin
+        const distToOriginNm = primarySpill
+          ? Math.hypot((lat - primarySpill.origin_lat) * 60, (lng - primarySpill.origin_lng) * 56)
+          : 999;
+        const inDischargeWindow = isSuspect && currentHour <= -24 && distToOriginNm < 8.0;
+        const isIntermittent = inDischargeWindow || (isSuspect && currentHour <= -30 && currentHour >= -45);
+
+        return {
+          ...v,
+          currentLat: lat,
+          currentLng: lng,
+          isIntermittent,
+          inDischargeWindow,
+        };
       } else {
         // Project forward based on SOG & COG
         const hoursAhead = currentHour;
-        const speedKnots = v.sog || 10;
+        const speedKnots = v.sog || 11.5;
         const headingRad = (v.cog * Math.PI) / 180;
         const distNm = speedKnots * hoursAhead;
         const dLat = (distNm / 60) * Math.cos(headingRad);
         const dLng = (distNm / (60 * Math.cos((v.lat * Math.PI) / 180))) * Math.sin(headingRad);
-        return { ...v, currentLat: v.lat + dLat, currentLng: v.lng + dLng };
+
+        return {
+          ...v,
+          currentLat: v.lat + dLat,
+          currentLng: v.lng + dLng,
+          isIntermittent: false,
+          inDischargeWindow: false,
+        };
       }
     });
-  }, [filteredVessels, currentHour]);
+  }, [filteredVessels, currentHour, primarySpill]);
 
-  // Get current particle positions based on scrubber hour
-  const currentParticlePositions = useMemo(() => {
-    if (!particles.length) return [];
-    // Round to nearest available key in time_offsets (-48, -36, -24, -12, -6, -3, 0, 3, 6, 12, 24, 36, 48, 60, 72)
-    const keys = [-48, -36, -24, -12, -6, -3, 0, 3, 6, 12, 24, 36, 48, 60, 72];
-    const closestHour = keys.reduce((prev, curr) =>
-      Math.abs(curr - currentHour) < Math.abs(prev - currentHour) ? curr : prev
-    );
-
-    return particles.map((p) => ({
-      id: p.id,
-      pos: p.time_offsets[closestHour] || [p.base_lat, p.base_lng],
-      state: p.weathering_state,
-    }));
-  }, [particles, currentHour]);
-
-  // Backward and Forward Drift trajectory paths for primary spill
-  const primarySpill = selectedSpill || spills[0];
+  // Backward and Forward Drift trajectory streamlines for primary spill
   const backwardDriftPath: [number, number][] = primarySpill
     ? [
         [primarySpill.origin_lat, primarySpill.origin_lng],
@@ -217,9 +278,9 @@ export default function LiveTacticalMap() {
     return (
       <div className="flex items-center justify-center h-full bg-[#0a0f18]">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 size={32} className="animate-spin text-ocean-cyan" />
+          <Loader2 size={32} className="animate-spin text-[#00f0ff]" />
           <span className="font-mono text-xs tracking-widest text-slate-400 uppercase">
-            INITIALIZING TACTICAL RADAR & BATHYMETRIC GRID...
+            INITIALIZING 4D HYDRODYNAMIC RADAR & BATHYMETRIC GRID...
           </span>
         </div>
       </div>
@@ -231,8 +292,8 @@ export default function LiveTacticalMap() {
       {/* Primary Leaflet Tactical Map */}
       <div className="flex-1 h-full w-full relative">
         <MapContainer
-          center={[15.5, 76.0]}
-          zoom={5}
+          center={[17.0, 74.0]}
+          zoom={6}
           className="w-full h-full"
           ref={(m) => {
             if (m) mapRef.current = m;
@@ -277,109 +338,164 @@ export default function LiveTacticalMap() {
                   <div className="font-mono text-[10px] space-y-0.5">
                     <div className="text-amber-400 font-bold uppercase">{zone.name}</div>
                     <div className="text-slate-300">TYPE: {zone.type.replace('_', ' ')}</div>
-                    <div className="text-rose-400 font-bold">ESI SENSITIVITY: {zone.esi_index.toFixed(1)} / 10</div>
-                    <div className="text-slate-400">DIST TO SLICK: {formatDistance(zone.distance_to_spill_nm)}</div>
-                    <div className="text-amber-300">EST. IMPACT: T + {zone.estimated_impact_hrs.toFixed(1)}h</div>
+                    <div className="text-rose-400 font-bold">
+                      ESI SENSITIVITY: {zone.esi_index.toFixed(1)} / 10
+                    </div>
+                    <div className="text-slate-400">
+                      DIST TO SLICK: {formatDistance(zone.distance_to_spill_nm)}
+                    </div>
+                    <div className="text-amber-300">
+                      EST. IMPACT: T + {zone.estimated_impact_hrs.toFixed(1)}h
+                    </div>
                   </div>
                 </Tooltip>
               </Polygon>
             ))}
 
-          {/* 3. Backward Drift Path (-48h to 0h) */}
+          {/* 3. Backward Hydrodynamic Drift Path (-48h to 0h) */}
           {showTrajectories && primarySpill && (
             <>
               <Polyline
                 positions={backwardDriftPath}
                 pathOptions={{
-                  color: '#00f0ff',
-                  weight: 2,
-                  dashArray: '6 5',
+                  color: '#f59e0b',
+                  weight: 2.5,
+                  dashArray: '6 6',
                   opacity: 0.85,
                 }}
               />
               {/* Origin Marker (-48h) */}
               <Marker
                 position={[primarySpill.origin_lat, primarySpill.origin_lng]}
-                icon={createOriginMarker()}
+                icon={createOriginMarker('BILGE DISCHARGE ORIGIN (-48h)')}
               >
                 <Tooltip>
                   <div className="font-mono text-[10px] space-y-0.5">
-                    <div className="text-ocean-cyan font-bold">ESTIMATED RELEASE ORIGIN (T -48h)</div>
+                    <div className="text-amber-400 font-bold">ESTIMATED RELEASE ORIGIN (T -48h)</div>
                     <div className="text-slate-200">
                       {formatCoordinates(primarySpill.origin_lat, primarySpill.origin_lng)}
                     </div>
-                    <div className="text-slate-400">BACKWARD HYDRODYNAMIC INTERSECT</div>
+                    <div className="text-slate-400">OPENDRIFT BACKWARD CONVERGENCE POINT</div>
                   </div>
                 </Tooltip>
               </Marker>
             </>
           )}
 
-          {/* 4. Forward Drift Path (0h to +72h) */}
+          {/* 4. Forward Hydrodynamic Drift Path (0h to +72h) */}
           {showTrajectories && primarySpill && (
             <>
               <Polyline
                 positions={forwardDriftPath}
                 pathOptions={{
-                  color: '#f59e0b',
+                  color: '#38bdf8',
                   weight: 2,
-                  dashArray: '6 5',
-                  opacity: 0.85,
+                  dashArray: '5 5',
+                  opacity: 0.8,
                 }}
               />
               <CircleMarker
                 center={[primarySpill.forward_drift_lat, primarySpill.forward_drift_lng]}
-                radius={5}
+                radius={6}
                 pathOptions={{
-                  color: '#f59e0b',
-                  fillColor: '#f59e0b',
+                  color: '#f43f5e',
+                  fillColor: '#f43f5e',
                   fillOpacity: 0.5,
-                  weight: 1.5,
+                  weight: 2,
                 }}
               >
                 <Tooltip>
                   <div className="font-mono text-[10px]">
-                    <div className="text-amber-400 font-bold">FORWARD DRIFT PROJECTION (+72h)</div>
+                    <div className="text-rose-400 font-bold">FORWARD IMPACT FORECAST (+72h)</div>
                     <div className="text-slate-200">
                       {formatCoordinates(primarySpill.forward_drift_lat, primarySpill.forward_drift_lng)}
                     </div>
+                    <div className="text-amber-300">SHORELINE REACH PROBABILITY: 78.4%</div>
                   </div>
                 </Tooltip>
               </CircleMarker>
             </>
           )}
 
-          {/* 5. OpenDrift Particle Cloud */}
-          {showOpenDrift &&
-            currentParticlePositions.map((p) => {
-              const pColor =
-                currentHour < 0
-                  ? '#00f0ff'
-                  : p.state === 'EMULSIFIED'
-                  ? '#f59e0b'
-                  : p.state === 'BEACHED'
-                  ? '#f43f5e'
-                  : '#38bdf8';
-              return (
-                <CircleMarker
-                  key={p.id}
-                  center={p.pos}
-                  radius={currentHour >= 24 ? 3 : 2}
-                  pathOptions={{
-                    color: pColor,
-                    fillColor: pColor,
-                    fillOpacity: 0.65,
-                    weight: 0,
-                  }}
-                />
-              );
-            })}
+          {/* 5. Environmental Streamline Vectors (Current & Wind) */}
+          {showStreamlines &&
+            environmentalVectors.map((vec, idx) => (
+              <Marker
+                key={`vec-${idx}`}
+                position={[vec.startLat, vec.startLng]}
+                icon={createStreamlineVectorIcon(
+                  vec.type,
+                  vec.type === 'WIND' ? 315 : 125,
+                  vec.magnitudeKts
+                )}
+              />
+            ))}
 
-          {/* 6. Spills Ground Truth Polygons */}
+          {/* 6. Dynamic Iso-Concentration Dispersion Contours (Core -> Sheen -> Rainbow) */}
+          {showContours && concentrationContours.dispersionHull.length > 2 && (
+            <Polygon
+              positions={concentrationContours.dispersionHull}
+              pathOptions={{
+                color: '#00f0ff',
+                fillColor: '#00f0ff',
+                fillOpacity: 0.08,
+                weight: 1,
+                dashArray: '3 3',
+              }}
+            />
+          )}
+
+          {showContours && concentrationContours.sheenHull.length > 2 && (
+            <Polygon
+              positions={concentrationContours.sheenHull}
+              pathOptions={{
+                color: '#38bdf8',
+                fillColor: '#38bdf8',
+                fillOpacity: 0.2,
+                weight: 1.5,
+              }}
+            />
+          )}
+
+          {showContours && concentrationContours.coreHull.length > 2 && (
+            <Polygon
+              positions={concentrationContours.coreHull}
+              pathOptions={{
+                color: currentHour < 0 ? '#f59e0b' : '#f43f5e',
+                fillColor: currentHour < 0 ? '#f59e0b' : '#f43f5e',
+                fillOpacity: 0.45,
+                weight: 2,
+              }}
+            />
+          )}
+
+          {/* 7. OpenDrift 110-Particle Cloud with Directional Streamlines */}
+          {showOpenDrift &&
+            dynamicParticles.map((p) => (
+              <Marker
+                key={`p-${p.id}`}
+                position={[p.lat, p.lng]}
+                icon={createParticleDivIcon(p)}
+              >
+                <Tooltip>
+                  <div className="font-mono text-[9px] space-y-0.5">
+                    <div className="text-[#00f0ff] font-bold">OPENDRIFT PARTICLE #{p.id}</div>
+                    <div className="text-slate-300">STATE: {p.state}</div>
+                    <div className="text-slate-300">DENSITY: {formatPercent(p.density * 100, 0)}</div>
+                    <div className="text-slate-400">DRIFT SPEED: {p.speedKts} kts</div>
+                    <div className="text-slate-400">DROPLET SIZE: {p.dropletSizeUm} µm</div>
+                  </div>
+                </Tooltip>
+              </Marker>
+            ))}
+
+          {/* 8. Spills Ground Truth Polygon (Distinct Sentinel-1 SAR Footprint at T=0) */}
           {showSpills &&
             spills.map((spill) => {
               const isCrit = spill.severity === 'CRITICAL';
-              const color = isCrit ? '#f43f5e' : '#00f0ff';
+              const isDetectionFocus = Math.abs(currentHour) < 1.0;
+              const color = isDetectionFocus ? '#00f0ff' : isCrit ? '#f43f5e' : '#38bdf8';
+
               return (
                 <Polygon
                   key={spill.id}
@@ -387,19 +503,23 @@ export default function LiveTacticalMap() {
                   pathOptions={{
                     color,
                     fillColor: color,
-                    fillOpacity: 0.25,
-                    weight: 2,
+                    fillOpacity: isDetectionFocus ? 0.35 : 0.2,
+                    weight: isDetectionFocus ? 2.5 : 1.5,
+                    dashArray: isDetectionFocus ? undefined : '4 4',
                   }}
                 >
                   <Tooltip sticky>
                     <div className="font-mono text-[10px] space-y-0.5">
-                      <div className="text-ocean-cyan font-bold">{spill.spill_id}</div>
+                      <div className="text-[#00f0ff] font-bold">{spill.spill_id}</div>
                       <div className="text-slate-100 font-semibold">{spill.name}</div>
                       <div className="text-slate-300">
-                        AREA: {formatArea(spill.area_km2)} • SEVERITY: {spill.severity}
+                        SURFACE AREA: {formatArea(weatheringTelemetry.activeAreaKm2)} (DYNAMIC)
                       </div>
-                      <div className="text-slate-400">
-                        VOLUME: {formatVolume(spill.estimated_volume_liters)}
+                      <div className="text-slate-300">
+                        VOL REMAINING: {formatVolume(weatheringTelemetry.volumeRemainingLiters)}
+                      </div>
+                      <div className="text-amber-300">
+                        EVAPORATED: {weatheringTelemetry.evaporatedPercent}%
                       </div>
                       <div className="text-slate-400">
                         POSITION: {formatCoordinates(spill.lat, spill.lng)}
@@ -410,16 +530,13 @@ export default function LiveTacticalMap() {
               );
             })}
 
-          {/* 7. AIS Vessel Trajectory & Directional Markers */}
+          {/* 9. AIS Vessel Trajectory & Directional Markers */}
           {showVessels &&
             interpolatedVessels.map((v) => {
               const isSuspect = v.risk === 'CRITICAL' || v.risk === 'HIGH';
               const isSilent = v.ais_status === 'SILENT';
-
-              // Distance to selected spill
-              const distToCenterNm = primarySpill
-                ? Math.hypot((v.currentLat - primarySpill.lat) * 60, (v.currentLng - primarySpill.lng) * 54.6)
-                : 0;
+              const isIntermittent = (v as any).isIntermittent;
+              const inDischargeWindow = (v as any).inDischargeWindow;
 
               return (
                 <div key={v.id}>
@@ -428,10 +545,16 @@ export default function LiveTacticalMap() {
                     <Polyline
                       positions={v.track_history}
                       pathOptions={{
-                        color: isSilent ? '#f43f5e' : isSuspect ? '#f59e0b' : '#38bdf8',
-                        weight: 1.5,
-                        dashArray: '3 3',
-                        opacity: 0.5,
+                        color: inDischargeWindow
+                          ? '#f43f5e'
+                          : isSilent
+                          ? '#f43f5e'
+                          : isSuspect
+                          ? '#f59e0b'
+                          : '#38bdf8',
+                        weight: inDischargeWindow ? 3 : 1.5,
+                        dashArray: inDischargeWindow ? undefined : '3 3',
+                        opacity: inDischargeWindow ? 0.95 : 0.45,
                       }}
                     />
                   )}
@@ -439,12 +562,17 @@ export default function LiveTacticalMap() {
                   {/* Directional Vessel Marker */}
                   <Marker
                     position={[v.currentLat, v.currentLng]}
-                    icon={createDirectionalVesselMarker(v.cog, isSuspect, isSilent)}
+                    icon={createDirectionalVesselMarker(
+                      v.cog,
+                      isSuspect,
+                      isSilent,
+                      isIntermittent
+                    )}
                   >
                     <Tooltip sticky>
-                      <div className="font-mono text-[10px] space-y-0.5 min-w-[180px]">
+                      <div className="font-mono text-[10px] space-y-0.5 min-w-[200px]">
                         <div className="flex items-center justify-between border-b border-slate-700 pb-1 mb-1">
-                          <span className="text-ocean-cyan font-bold">{v.name}</span>
+                          <span className="text-[#00f0ff] font-bold">{v.name}</span>
                           <span
                             className="font-bold"
                             style={{ color: riskColors[v.risk] }}
@@ -452,19 +580,23 @@ export default function LiveTacticalMap() {
                             {v.risk}
                           </span>
                         </div>
+                        {inDischargeWindow && (
+                          <div className="text-rose-400 font-bold bg-rose-950/60 px-1 py-0.5 rounded border border-rose-500/50 animate-pulse">
+                            ⚠️ RELEASE CORRIDOR COINCIDENCE
+                          </div>
+                        )}
                         <div className="text-slate-300">MMSI: {v.mmsi}</div>
                         <div className="text-slate-300">TYPE: {v.type}</div>
                         <div className="text-slate-300">FLAG: {v.flag}</div>
                         <div className="text-slate-200">
                           SOG: {formatSpeed(v.sog)} • COG: {formatCourse(v.cog)}
                         </div>
-                        <div className="text-cyan-300">
-                          DIST TO SLICK: {formatDistance(distToCenterNm)}
-                        </div>
                         <div className="text-slate-400">
-                          COORDINATES: {formatCoordinates(v.currentLat, v.currentLng)}
+                          POSITION: {formatCoordinates(v.currentLat, v.currentLng)}
                         </div>
-                        <div className="text-slate-400">AIS STATUS: {v.ais_status}</div>
+                        <div className="text-amber-400">
+                          AIS STATUS: {isIntermittent ? 'TRANSPONDER GAP' : v.ais_status}
+                        </div>
                       </div>
                     </Tooltip>
                   </Marker>
@@ -480,18 +612,18 @@ export default function LiveTacticalMap() {
               onClick={() => setShowLayersMenu(!showLayersMenu)}
               className={`flex items-center gap-2 px-3 py-1.5 border transition-all text-xs font-mono ${
                 showLayersMenu
-                  ? 'border-cyan-500/60 bg-cyan-950/40 text-ocean-cyan'
+                  ? 'border-cyan-500/60 bg-cyan-950/40 text-[#00f0ff]'
                   : 'border-slate-800 bg-slate-900/60 text-slate-300 hover:border-slate-700'
               }`}
             >
-              <Layers size={14} className="text-ocean-cyan" />
+              <Layers size={14} className="text-[#00f0ff]" />
               <span>MAP LAYERS</span>
             </button>
 
             {/* Quick SAR Inspector Trigger */}
             <button
               onClick={() => setSarModalOpen(true)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-cyan-950/30 border border-cyan-500/40 text-ocean-cyan hover:bg-cyan-950/60 transition-all text-xs font-mono shadow-[0_0_10px_rgba(0,240,255,0.15)]"
+              className="flex items-center gap-2 px-3 py-1.5 bg-cyan-950/30 border border-cyan-500/40 text-[#00f0ff] hover:bg-cyan-950/60 transition-all text-xs font-mono shadow-[0_0_10px_rgba(0,240,255,0.15)]"
             >
               <Eye size={14} />
               <span>SAR INSPECTOR</span>
@@ -500,7 +632,7 @@ export default function LiveTacticalMap() {
 
           {/* Layers Popover Menu */}
           {showLayersMenu && (
-            <div className="w-80 bg-[#0d1524]/95 backdrop-blur-md border border-slate-700 p-4 shadow-2xl space-y-4 tactical-corners">
+            <div className="w-80 bg-[#0d1524]/95 backdrop-blur-md border border-slate-700 p-4 shadow-2xl space-y-4 tactical-corners max-h-[80vh] overflow-y-auto">
               {/* Base Chart Selection */}
               <div>
                 <span className="font-mono text-[9px] text-slate-400 tracking-widest uppercase font-semibold block mb-2">
@@ -513,11 +645,15 @@ export default function LiveTacticalMap() {
                       onClick={() => setActiveBaseLayer(l.id)}
                       className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs font-mono transition-colors ${
                         activeBaseLayer === l.id
-                          ? 'bg-cyan-950/50 text-ocean-cyan border border-cyan-500/40'
+                          ? 'bg-cyan-950/50 text-[#00f0ff] border border-cyan-500/40'
                           : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
                       }`}
                     >
-                      <span className={`w-2 h-2 rounded-full ${activeBaseLayer === l.id ? 'bg-cyan-400' : 'bg-slate-600'}`} />
+                      <span
+                        className={`w-2 h-2 rounded-full ${
+                          activeBaseLayer === l.id ? 'bg-[#00f0ff]' : 'bg-slate-600'
+                        }`}
+                      />
                       <span>{l.label}</span>
                     </button>
                   ))}
@@ -527,13 +663,52 @@ export default function LiveTacticalMap() {
               {/* Data Overlay Toggles */}
               <div className="border-t border-slate-800 pt-3">
                 <span className="font-mono text-[9px] text-slate-400 tracking-widest uppercase font-semibold block mb-2">
-                  TACTICAL OVERLAYS
+                  TACTICAL HYDRODYNAMIC OVERLAYS
                 </span>
                 <div className="space-y-2 font-mono text-xs text-slate-300">
                   <label className="flex items-center justify-between cursor-pointer">
                     <span className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 bg-[#00f0ff] rounded-full animate-pulse" />
+                      OpenDrift Particle Cloud (110)
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={showOpenDrift}
+                      onChange={(e) => setShowOpenDrift(e.target.checked)}
+                      className="accent-cyan-400 cursor-pointer"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="flex items-center gap-2">
+                      <span className="w-3 h-2 bg-gradient-to-r from-amber-500 to-rose-500 rounded-sm opacity-80" />
+                      Iso-Concentration Contours
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={showContours}
+                      onChange={(e) => setShowContours(e.target.checked)}
+                      className="accent-cyan-400 cursor-pointer"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="flex items-center gap-2">
+                      <span className="w-3 h-0.5 bg-[#00f0ff]" />
+                      Current & Wind Streamlines
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={showStreamlines}
+                      onChange={(e) => setShowStreamlines(e.target.checked)}
+                      className="accent-cyan-400 cursor-pointer"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 bg-rose-500/30 border border-rose-500" />
-                      Oil Spill Slicks
+                      Oil Spill Footprint (SAR)
                     </span>
                     <input
                       type="checkbox"
@@ -545,8 +720,8 @@ export default function LiveTacticalMap() {
 
                   <label className="flex items-center justify-between cursor-pointer">
                     <span className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 bg-cyan-400 rounded-full" />
-                      AIS Vessels & Tracks
+                      <span className="w-2.5 h-2.5 bg-[#00f0ff] rounded-full" />
+                      AIS Vessels & Trajectories
                     </span>
                     <input
                       type="checkbox"
@@ -568,32 +743,6 @@ export default function LiveTacticalMap() {
                       className="accent-cyan-400 cursor-pointer"
                     />
                   </label>
-
-                  <label className="flex items-center justify-between cursor-pointer">
-                    <span className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 bg-cyan-500 rounded-full animate-ping" />
-                      OpenDrift Particle Cloud
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={showOpenDrift}
-                      onChange={(e) => setShowOpenDrift(e.target.checked)}
-                      className="accent-cyan-400 cursor-pointer"
-                    />
-                  </label>
-
-                  <label className="flex items-center justify-between cursor-pointer">
-                    <span className="flex items-center gap-2">
-                      <span className="w-4 h-0.5 bg-cyan-400 border-dashed" />
-                      Drift Vectors & Trajectories
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={showTrajectories}
-                      onChange={(e) => setShowTrajectories(e.target.checked)}
-                      className="accent-cyan-400 cursor-pointer"
-                    />
-                  </label>
                 </div>
               </div>
 
@@ -603,7 +752,9 @@ export default function LiveTacticalMap() {
                   <span className="font-mono text-[9px] text-slate-400 uppercase font-semibold">
                     SENTINEL-1 SAR OPACITY
                   </span>
-                  <span className="font-mono text-xs text-ocean-cyan">{formatPercent(sarOpacity * 100, 0)}</span>
+                  <span className="font-mono text-xs text-[#00f0ff]">
+                    {formatPercent(sarOpacity * 100, 0)}
+                  </span>
                 </div>
                 <input
                   type="range"
@@ -615,44 +766,92 @@ export default function LiveTacticalMap() {
                     setSarOpacity(Number(e.target.value));
                     setShowSarOverlay(true);
                   }}
-                  className="w-full accent-cyan-400 cursor-pointer"
+                  className="w-full accent-[#00f0ff] cursor-pointer"
                 />
               </div>
             </div>
           )}
         </div>
 
-        {/* Floating Top-Right: Quick Incident Details & Wind Telemetry */}
+        {/* Floating Top-Right: Dynamic Physics Telemetry HUD Sync */}
         {primarySpill && (
           <div className="absolute top-4 right-4 z-[1000] hidden md:flex flex-col gap-2">
-            <div className="bg-[#0d1524]/90 backdrop-blur-md border border-slate-800 p-3 shadow-xl tactical-corners w-72 space-y-2">
+            <div className="bg-[#0b1320]/95 backdrop-blur-md border border-slate-800 p-3 shadow-xl tactical-corners w-80 space-y-2.5">
               <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
-                <span className="font-mono text-[9px] text-ocean-cyan tracking-widest uppercase font-semibold">
-                  ACTIVE SPILL TELEMETRY
-                </span>
-                <span className="status-badge text-[9px] text-rose-400 border-rose-500/40 bg-rose-950/20 pulse-red">
-                  {primarySpill.severity}
+                <div className="flex items-center gap-1.5">
+                  <Activity size={13} className="text-[#00f0ff] animate-pulse" />
+                  <span className="font-mono text-[9px] text-[#00f0ff] tracking-widest uppercase font-semibold">
+                    HYDRODYNAMIC TELEMETRY HUD
+                  </span>
+                </div>
+                <span
+                  className="font-mono text-[9px] px-1.5 py-0.5 rounded border"
+                  style={{
+                    color: weatheringTelemetry.severityColor,
+                    borderColor: `${weatheringTelemetry.severityColor}60`,
+                    backgroundColor: `${weatheringTelemetry.severityColor}15`,
+                  }}
+                >
+                  {weatheringTelemetry.phase}
                 </span>
               </div>
-              <p className="font-sans font-semibold text-xs text-slate-100">{primarySpill.name}</p>
+
+              <div className="flex items-center justify-between text-xs">
+                <p className="font-sans font-semibold text-slate-100 truncate">
+                  {primarySpill.name}
+                </p>
+                <span className="font-mono text-[10px] text-slate-400">
+                  {currentHour >= 0 ? `+${currentHour.toFixed(1)}h` : `${currentHour.toFixed(1)}h`}
+                </span>
+              </div>
+
+              {/* Dynamic Metrics Grid synchronized with simulation time */}
               <div className="grid grid-cols-2 gap-2 font-mono text-[10px]">
-                <div className="bg-slate-950/60 p-1.5 rounded border border-slate-800">
-                  <span className="text-slate-400 block">AREA:</span>
-                  <span className="text-slate-100 font-bold">{formatArea(primarySpill.area_km2)}</span>
+                <div className="bg-slate-950/70 p-2 rounded border border-slate-800/80">
+                  <span className="text-slate-400 block text-[9px]">DYNAMIC SLICK AREA:</span>
+                  <span className="text-[#00f0ff] font-bold text-xs">
+                    {formatArea(weatheringTelemetry.activeAreaKm2)}
+                  </span>
                 </div>
-                <div className="bg-slate-950/60 p-1.5 rounded border border-slate-800">
-                  <span className="text-slate-400 block">EST. VOLUME:</span>
-                  <span className="text-slate-100 font-bold">{formatVolume(primarySpill.estimated_volume_liters)}</span>
+                <div className="bg-slate-950/70 p-2 rounded border border-slate-800/80">
+                  <span className="text-slate-400 block text-[9px]">VOLUME REMAINING:</span>
+                  <span className="text-slate-100 font-bold text-xs">
+                    {formatVolume(weatheringTelemetry.volumeRemainingLiters)}
+                  </span>
                 </div>
-                <div className="bg-slate-950/60 p-1.5 rounded border border-slate-800">
-                  <span className="text-slate-400 block">WIND VECTOR:</span>
-                  <span className="text-cyan-400">{formatSpeed(primarySpill.wind_speed_kts)} @ {formatCourse(primarySpill.wind_direction_deg)}</span>
+                <div className="bg-slate-950/70 p-2 rounded border border-slate-800/80">
+                  <span className="text-slate-400 block text-[9px]">EVAPORATED FRACTION:</span>
+                  <span className="text-amber-400 font-bold">
+                    {weatheringTelemetry.evaporatedPercent}%
+                  </span>
                 </div>
-                <div className="bg-slate-950/60 p-1.5 rounded border border-slate-800">
-                  <span className="text-slate-400 block">SURFACE CURRENT:</span>
-                  <span className="text-amber-400">{formatSpeed(primarySpill.current_speed_kts)} @ {formatCourse(primarySpill.current_direction_deg)}</span>
+                <div className="bg-slate-950/70 p-2 rounded border border-slate-800/80">
+                  <span className="text-slate-400 block text-[9px]">WATER EMULSIFICATION:</span>
+                  <span className="text-cyan-300 font-bold">
+                    {weatheringTelemetry.emulsifiedPercent}%
+                  </span>
                 </div>
               </div>
+
+              {/* Coastal proximity alert */}
+              <div className="bg-slate-950/60 p-2 rounded border border-slate-800 flex items-center justify-between text-[10px] font-mono">
+                <div className="flex items-center gap-1.5 text-slate-300">
+                  <Compass size={13} className="text-[#00f0ff]" />
+                  <span>DIST TO SHORELINE:</span>
+                </div>
+                <span className="text-slate-100 font-bold">
+                  {weatheringTelemetry.distanceToShoreNm} NM
+                </span>
+              </div>
+
+              {weatheringTelemetry.beachedPercent > 0 && (
+                <div className="bg-rose-950/80 border border-rose-500/60 p-1.5 rounded flex items-center gap-2 text-rose-300 text-[10px] font-mono animate-pulse">
+                  <ShieldAlert size={14} className="text-rose-400 shrink-0" />
+                  <span>
+                    SHORELINE IMPACT CONFIRMED: {weatheringTelemetry.beachedPercent}% BEACHED
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -663,6 +862,7 @@ export default function LiveTacticalMap() {
             currentHour={currentHour}
             onChange={setCurrentHour}
             detectedAt={primarySpill?.detected_at}
+            weatheringTelemetry={weatheringTelemetry}
           />
         </div>
       </div>
