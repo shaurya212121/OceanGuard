@@ -5,6 +5,7 @@ import LiveTacticalMap from '@/pages/LiveTacticalMap';
 import InvestigationsDesk from '@/pages/InvestigationsDesk';
 import VesselsRegistry from '@/pages/VesselsRegistry';
 import AnalyticsReports from '@/pages/AnalyticsReports';
+import LiveDetectionDemo from '@/pages/LiveDetectionDemo';
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
           <Route path="/investigations" element={<InvestigationsDesk />} />
           <Route path="/vessels" element={<VesselsRegistry />} />
           <Route path="/analytics" element={<AnalyticsReports />} />
+          <Route path="/detect" element={<LiveDetectionDemo />} />
         </Route>
       </Routes>
     </BrowserRouter>

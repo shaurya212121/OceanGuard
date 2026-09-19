@@ -18,7 +18,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 from app.services.cv.pipeline import detect_oil_spill
 from app.models import OilSpill, VesselTrack, VesselPosition
 from app.services.data_generator import generate_vessels
-from app.services.drift_simulator import simulate_drift
+from app.services.drift_simulator import simulate_drift, get_seasonal_params
 from app.services.vessel_scorer import score_vessels
 from app.services.ecological_threats import check_ecological_threats
 
@@ -210,10 +210,14 @@ for img_path in image_paths:
             estimated_volume_liters=res.total_area_sq_km * 1_000_000 * 0.001 * 1000,  # Assumed uniform 1mm thickness
             spill_type=json.dumps(spill_type_data)
         )
+        # Seasonal monsoon-driven current lookup (static representative values,
+        # see drift_simulator.py docstring for citation / disclosure)
+        seasonal = get_seasonal_params(spill.center_lat, spill.center_lon, base_time.month)
         drift = simulate_drift(
             spill.center_lat, spill.center_lon, base_time,
             hours_back=24, hours_forward=48,
-            current_speed_knots=1.5, current_direction_deg=180.0,
+            current_speed_knots=seasonal["current_speed_knots"],
+            current_direction_deg=seasonal["current_dir_deg"],
         )
         spills.append(spill)
         drifts.append(drift)

@@ -8,6 +8,7 @@ const pageNames: Record<string, string> = {
   '/investigations': 'Investigations Desk',
   '/vessels': 'Vessels Registry',
   '/analytics': 'Analytics & Reports',
+  '/detect': 'Live Detection Demo',
 };
 
 function useCurrentPath() {

@@ -1,6 +1,6 @@
 import metrics from '@/data/metrics.json';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Radar, Search, Ship, BarChart3, Settings, ShieldCheck, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Radar, Search, Ship, BarChart3, Settings, ShieldCheck, ChevronRight, Upload } from 'lucide-react';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, code: 'DASH' },
@@ -8,6 +8,7 @@ const navItems = [
   { to: '/investigations', label: 'Investigations Desk', icon: Search, code: 'INV' },
   { to: '/vessels', label: 'Vessels Registry', icon: Ship, code: 'VES' },
   { to: '/analytics', label: 'Analytics & Reports', icon: BarChart3, code: 'ANL' },
+  { to: '/detect', label: 'Live Detection Demo', icon: Upload, code: 'DET' },
 ];
 
 export default function Sidebar() {

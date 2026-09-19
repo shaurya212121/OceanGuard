@@ -137,8 +137,8 @@ export default function Dashboard() {
           </div>
           <div className="h-80 border border-ocean-border relative">
             <MapContainer
-              center={[25.2, 55.5]}
-              zoom={6}
+              center={[20.5937, 78.9629]}
+              zoom={5}
               className="w-full h-full"
               ref={(m) => { if (m) mapRef.current = m; }}
               zoomControl={false}

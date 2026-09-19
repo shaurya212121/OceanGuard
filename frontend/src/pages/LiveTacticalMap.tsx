@@ -93,8 +93,8 @@ export default function LiveTacticalMap() {
       {/* Map */}
       <div className="flex-1 relative">
         <MapContainer
-          center={[25.2, 55.5]}
-          zoom={7}
+          center={[20.5937, 78.9629]}
+          zoom={5}
           className="w-full h-full"
           ref={(m) => { if (m) mapRef.current = m; }}
           zoomControl={false}
