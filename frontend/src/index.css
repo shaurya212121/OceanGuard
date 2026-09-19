@@ -1,4 +1,4 @@
-﻿@tailwind base;
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -6,98 +6,131 @@
   html, body, #root {
     height: 100%;
     margin: 0;
-    background-color: #030C14;
-    color: #E0F2FE;
-    font-family: 'Space Grotesk', system-ui, sans-serif;
+    background-color: #0a0f18;
+    color: #f8fafc;
+    font-family: 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
   }
 }
 
 @layer components {
-  /* Tactical panel with corner bezel tick-marks */
+  /* Tactical console card with subtle glassmorphism */
+  .tactical-card {
+    position: relative;
+    background-color: rgba(17, 24, 39, 0.82);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid #1e293b;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .tactical-card:hover {
+    border-color: rgba(51, 65, 85, 0.9);
+  }
+
+  /* Tactical panel with corner tick-marks */
   .tactical-panel {
     position: relative;
-    background-color: #0A1929;
-    border: 1px solid #1E3A8A;
+    background-color: rgba(17, 24, 39, 0.88);
+    backdrop-filter: blur(8px);
+    border: 1px solid #1e293b;
   }
   .tactical-panel::before,
   .tactical-panel::after {
     content: '';
     position: absolute;
-    width: 10px;
-    height: 10px;
-    border-color: #00F0FF;
+    width: 8px;
+    height: 8px;
+    border-color: #00f0ff;
     border-style: solid;
     pointer-events: none;
   }
   .tactical-panel::before {
     top: -1px;
     left: -1px;
-    border-width: 1px 0 0 1px;
+    border-width: 1.5px 0 0 1.5px;
   }
   .tactical-panel::after {
     bottom: -1px;
     right: -1px;
-    border-width: 0 1px 1px 0;
-  }
-
-  .tactical-panel-full::before,
-  .tactical-panel-full::after {
-    content: '';
-    position: absolute;
-    width: 10px;
-    height: 10px;
-    border-color: #00F0FF;
-    border-style: solid;
-    pointer-events: none;
+    border-width: 0 1.5px 1.5px 0;
   }
 
   /* All four corners */
   .tactical-corners {
     position: relative;
-  background-color: #0A1929;
-    border: 1px solid #1E3A8A;
-  overflow: visible;
+    background-color: rgba(17, 24, 39, 0.82);
+    backdrop-filter: blur(8px);
+    border: 1px solid #1e293b;
   }
   .tactical-corners::before,
   .tactical-corners::after {
     content: '';
     position: absolute;
-    width: 10px;
-    height: 10px;
-    border-color: #00F0FF;
+    width: 8px;
+    height: 8px;
+    border-color: #00f0ff;
     border-style: solid;
     pointer-events: none;
   }
   .tactical-corners::before {
     top: -1px;
     left: -1px;
-    border-width: 1px 0 0 1px;
+    border-width: 1.5px 0 0 1.5px;
   }
   .tactical-corners::after {
     bottom: -1px;
     right: -1px;
-    border-width: 0 1px 1px 0;
+    border-width: 0 1.5px 1.5px 0;
   }
 
-  /* Status badge â€” bracketed tag style */
-  .status-badge {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px;
+  /* Tactical Button */
+  .tactical-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
     font-weight: 500;
+    padding: 6px 12px;
+    border: 1px solid #1e293b;
+    background-color: rgba(17, 24, 39, 0.9);
+    color: #94a3b8;
+    transition: all 0.15s ease;
+  }
+  .tactical-btn:hover {
+    color: #f8fafc;
+    border-color: #00f0ff;
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+  }
+  .tactical-btn-active {
+    color: #00f0ff;
+    border-color: rgba(0, 240, 255, 0.6);
+    background-color: rgba(0, 240, 255, 0.1);
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.25);
+  }
+
+  /* Status badge — bracketed tag style */
+  .status-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
     letter-spacing: 0.05em;
     padding: 2px 8px;
     border: 1px solid;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
     text-transform: uppercase;
     white-space: nowrap;
+    border-radius: 2px;
   }
 
   /* Hairline divider */
   .hairline {
-    border-color: #1E3A8A;
+    border-color: #1e293b;
   }
 
   /* Scrollbar styling */
@@ -106,69 +139,82 @@
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #030C14;
+    background: #0a0f18;
   }
   ::-webkit-scrollbar-thumb {
-    background: #1E3A8A;
+    background: #1e293b;
+    border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #1E40AF;
+    background: #334155;
   }
 }
 
 /* Leaflet dark theme overrides */
 .leaflet-container {
-  background-color: #030C14 !important;
-  font-family: 'IBM Plex Mono', monospace !important;
+  background-color: #0a0f18 !important;
+  font-family: 'JetBrains Mono', monospace !important;
+}
+.leaflet-control-zoom {
+  border: 1px solid #1e293b !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
 }
 .leaflet-control-zoom a {
-  background-color: #0A1929 !important;
-  color: #E0F2FE !important;
-  border-color: #1E3A8A !important;
+  background-color: #111827 !important;
+  color: #94a3b8 !important;
+  border-bottom: 1px solid #1e293b !important;
+  transition: all 0.15s ease;
 }
 .leaflet-control-zoom a:hover {
-  background-color: #0F2138 !important;
-  border-color: #00F0FF !important;
+  background-color: #1e293b !important;
+  color: #00f0ff !important;
 }
 .leaflet-control-attribution {
-  background-color: rgba(3, 12, 20, 0.8) !important;
-  color: #475569 !important;
+  background-color: rgba(10, 15, 24, 0.85) !important;
+  color: #64748b !important;
+  font-size: 9px !important;
 }
 .leaflet-control-attribution a {
-  color: #7DD3FC !important;
+  color: #38bdf8 !important;
 }
 .leaflet-popup-content-wrapper {
-  background-color: #0A1929 !important;
-  color: #E0F2FE !important;
-  border: 1px solid #1E3A8A !important;
-  border-radius: 0 !important;
+  background-color: rgba(17, 24, 39, 0.95) !important;
+  color: #f8fafc !important;
+  border: 1px solid #1e293b !important;
+  border-radius: 2px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 0 15px rgba(0, 240, 255, 0.15) !important;
+  padding: 0 !important;
+}
+.leaflet-popup-content {
+  margin: 10px 12px !important;
+  line-height: 1.4 !important;
 }
 .leaflet-popup-tip {
-  background-color: #0A1929 !important;
-  border: 1px solid #1E3A8A !important;
+  background-color: #111827 !important;
+  border: 1px solid #1e293b !important;
 }
 
 /* Custom vessel marker */
 .vessel-marker {
   width: 10px;
   height: 10px;
-  background-color: #00F0FF;
-  border: 1px solid #030C14;
+  background-color: #00f0ff;
+  border: 1.5px solid #0a0f18;
   border-radius: 50%;
-  box-shadow: 0 0 6px rgba(0, 240, 255, 0.6);
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.8);
 }
 .vessel-marker-suspect {
-  background-color: #FF2A5F;
-  box-shadow: 0 0 8px rgba(255, 42, 95, 0.7);
+  background-color: #f43f5e;
+  box-shadow: 0 0 10px rgba(244, 63, 94, 0.9);
 }
 
 /* Pulse animation for critical alerts */
 @keyframes pulse-red {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.96); }
 }
 .pulse-red {
-  animation: pulse-red 1.5s ease-in-out infinite;
+  animation: pulse-red 1.8s ease-in-out infinite;
 }
 
 /* Blinking dot */
@@ -179,4 +225,18 @@
 .blink {
   animation: blink 2s ease-in-out infinite;
 }
-.map-tiles-dark { filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(110%); }
+
+/* Dark map invert filter for standard cartography */
+.map-tiles-dark {
+  filter: invert(100%) hue-rotate(180deg) brightness(80%) contrast(120%);
+}
+
+/* Radar scan line animation */
+@keyframes radar-sweep {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.animate-radar {
+  animation: radar-sweep 4s linear infinite;
+  transform-origin: center center;
+}

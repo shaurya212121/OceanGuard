@@ -15,6 +15,7 @@ export default function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/map" element={<LiveTacticalMap />} />
           <Route path="/investigations" element={<InvestigationsDesk />} />
+          <Route path="/investigations/:id" element={<InvestigationsDesk />} />
           <Route path="/vessels" element={<VesselsRegistry />} />
           <Route path="/analytics" element={<AnalyticsReports />} />
           <Route path="/detect" element={<LiveDetectionDemo />} />
