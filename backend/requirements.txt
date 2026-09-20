@@ -16,3 +16,4 @@ scikit-image>=0.22.0
 # checkpoint is present at backend/app/services/cv/weights/).
 # CPU-only install: pip install torch --index-url https://download.pytorch.org/whl/cpu
 torch>=2.2.0
+global-land-mask==1.0.0

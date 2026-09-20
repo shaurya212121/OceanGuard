@@ -3,6 +3,7 @@ import os
 import io
 import uuid
 import math
+from global_land_mask import globe
 import random
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -87,10 +88,17 @@ def generate_guilty_vessel_near(
             lon_off = (dist * math.sin(math.radians(heading_pre + 180))) / (
                 111.0 * math.cos(math.radians(closest_lat))
             )
+            nl = closest_lat + lat_off
+            nlo = closest_lon + lon_off
+            
+            # Simple clamping if on land (rare for guilty vessel since origin is in ocean, but good practice)
+            if globe.is_land(nl, nlo):
+                nl, nlo = closest_lat, closest_lon
+            
             vessel.positions.append(
                 VesselPosition(
-                    lat=closest_lat + lat_off,
-                    lon=closest_lon + lon_off,
+                    lat=nl,
+                    lon=nlo,
                     timestamp=dt,
                     speed_knots=speed_pre + random.uniform(-0.5, 0.5),
                     heading=heading_pre + random.uniform(-3, 3),

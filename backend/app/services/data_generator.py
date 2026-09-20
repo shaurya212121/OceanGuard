@@ -2,6 +2,7 @@ import os
 import random
 import uuid
 import math
+from global_land_mask import globe
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
 
@@ -43,8 +44,11 @@ def generate_vessels(base_time: datetime, count: int = 15) -> List[VesselTrack]:
         )
         
         # Start somewhere in Indian ocean
-        start_lat = random.uniform(8.0, 22.0)
-        start_lon = random.uniform(65.0, 85.0)
+        while True:
+            start_lat = random.uniform(8.0, 22.0)
+            start_lon = random.uniform(65.0, 85.0)
+            if not globe.is_land(start_lat, start_lon):
+                break
         
         # General heading
         heading = random.uniform(0, 360)
@@ -62,8 +66,16 @@ def generate_vessels(base_time: datetime, count: int = 15) -> List[VesselTrack]:
             d_lat = (speed_kmh * math.cos(math.radians(heading))) / 111.0 * 0.5 # 0.5 hours
             d_lon = (speed_kmh * math.sin(math.radians(heading))) / (111.0 * math.cos(math.radians(current_lat))) * 0.5
             
-            current_lat += d_lat
-            current_lon += d_lon
+            next_lat = current_lat + d_lat
+            next_lon = current_lon + d_lon
+            
+            # Land collision check
+            if globe.is_land(next_lat, next_lon):
+                # Stop advancing (drop anchor)
+                speed = 0.0
+            else:
+                current_lat = next_lat
+                current_lon = next_lon
             
             vessel.positions.append(VesselPosition(
                 lat=current_lat,
@@ -74,7 +86,8 @@ def generate_vessels(base_time: datetime, count: int = 15) -> List[VesselTrack]:
             ))
             
             # Randomly change heading slightly
-            heading = (heading + random.uniform(-5, 5)) % 360
+            if speed > 0:
+                heading = (heading + random.uniform(-5, 5)) % 360
             
         vessels.append(vessel)
     return vessels
