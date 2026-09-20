@@ -38,6 +38,7 @@ export interface OilSpill {
   forward_drift_lng: number;
   estimated_volume_liters?: number;
   metadata?: SpillMetadata;
+  driftPaths?: DriftPath[];
 }
 
 export interface Vessel {
@@ -57,6 +58,7 @@ export interface Vessel {
   imo: string | null;
   callsign: string | null;
   last_seen: string;
+  positions?: any[];
 }
 
 export interface SuspectVessel {
@@ -104,7 +106,7 @@ export interface SpillWithSuspects extends OilSpill {
 export async function fetchSpills(): Promise<OilSpill[]> {
   const { data, error } = await supabase
     .from('oil_spills')
-    .select('*')
+    .select('*, drift_paths(*)')
     .order('detected_at', { ascending: false });
 
   if (error) throw error;
@@ -124,6 +126,17 @@ export async function fetchSpills(): Promise<OilSpill[]> {
       severity: (spill.severity || 'UNKNOWN').toUpperCase(),
       status: (spill.status || 'UNKNOWN').toUpperCase(),
       metadata,
+      driftPaths: (spill.drift_paths || []).map((d: any) => ({
+        ...d,
+        direction: 'FORWARD',
+        waypoints: (d.forward_path || []).map((p: any) => [p.lat, p.lon]),
+        backward_path: d.backward_path || [],
+        forward_path: d.forward_path || [],
+        current_speed_knots: d.current_speed_knots,
+        current_dir_deg: d.current_dir_deg,
+        wind_speed_knots: d.wind_speed_knots,
+        wind_dir_deg: d.wind_dir_deg
+      }))
     };
   }) as OilSpill[];
 }
@@ -254,7 +267,8 @@ export async function fetchVessels(): Promise<Vessel[]> {
       risk: risk as RiskLevel,
       imo: v.imo_number,
       callsign: null,
-      last_seen: latestPos.timestamp
+      last_seen: latestPos.timestamp,
+      positions: positions
     };
   }) as Vessel[];
 }

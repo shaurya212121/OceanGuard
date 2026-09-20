@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { Play, Pause } from 'lucide-react';
 import { MapContainer, TileLayer, Polygon, Polyline, CircleMarker, Circle, Marker, Tooltip, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import { Search, Crosshair, Navigation, Target, FileText, Clock, MapPin, Loader2, AlertTriangle, Download } from 'lucide-react';
@@ -49,6 +50,60 @@ export default function InvestigationsDesk() {
   const [spills, setSpills] = useState<OilSpill[]>([]);
   const [selectedSpillId, setSelectedSpillId] = useState<string | null>(null);
   const [selectedSpill, setSelectedSpill] = useState<SpillWithSuspects | null>(null);
+  const [currentHour, setCurrentHour] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playSpeed, setPlaySpeed] = useState(1);
+
+  const driftData = selectedSpill?.driftPaths?.[0];
+  const backwardPath = driftData?.backward_path || [];
+  const forwardPath = driftData?.forward_path || [];
+  
+  const allPoints = useMemo(() => {
+    const pts = [...backwardPath, ...forwardPath];
+    pts.sort((a, b) => a.hours_offset - b.hours_offset);
+    return pts;
+  }, [backwardPath, forwardPath]);
+
+  const minHour = allPoints.length ? allPoints[0].hours_offset : -48;
+  const maxHour = allPoints.length ? allPoints[allPoints.length - 1].hours_offset : 72;
+
+  useEffect(() => {
+    if (isPlaying && currentHour >= maxHour) setIsPlaying(false);
+  }, [currentHour, maxHour, isPlaying]);
+
+  useEffect(() => {
+    let interval: any;
+    if (isPlaying) {
+      interval = setInterval(() => {
+        setCurrentHour(prev => Math.min(prev + (0.5 * playSpeed), maxHour));
+      }, 100);
+    }
+    return () => clearInterval(interval);
+  }, [isPlaying, playSpeed, maxHour]);
+
+  const activeTrail = useMemo(() => {
+    return allPoints.filter(p => p.hours_offset <= currentHour).map(p => [p.lat, p.lon] as [number, number]);
+  }, [allPoints, currentHour]);
+
+  const currentPos = useMemo(() => {
+    if (allPoints.length === 0) return [selectedSpill?.lat || 0, selectedSpill?.lng || 0] as [number, number];
+    if (currentHour <= minHour) return [allPoints[0].lat, allPoints[0].lon] as [number, number];
+    if (currentHour >= maxHour) return [allPoints[allPoints.length - 1].lat, allPoints[allPoints.length - 1].lon] as [number, number];
+    for (let i = 0; i < allPoints.length - 1; i++) {
+      if (allPoints[i].hours_offset <= currentHour && allPoints[i+1].hours_offset >= currentHour) {
+        const p1 = allPoints[i];
+        const p2 = allPoints[i+1];
+        const ratio = (currentHour - p1.hours_offset) / (p2.hours_offset - p1.hours_offset || 1);
+        return [
+          p1.lat + (p2.lat - p1.lat) * ratio,
+          p1.lon + (p2.lon - p1.lon) * ratio
+        ] as [number, number];
+      }
+    }
+    return [allPoints[0].lat, allPoints[0].lon] as [number, number];
+  }, [allPoints, currentHour, minHour, maxHour, selectedSpill]);
+
+
 
   const generatePDF = () => {
     if (!selectedSpill) return;
@@ -214,6 +269,7 @@ export default function InvestigationsDesk() {
     );
   }
 
+  
   const backwardDrift: [number, number][] = [
     [selectedSpill.lat, selectedSpill.lng],
     [selectedSpill.origin_lat, selectedSpill.origin_lng],
@@ -381,24 +437,22 @@ export default function InvestigationsDesk() {
                 </Tooltip>
               </Polygon>
 
-              {/* Backward drift — dashed cyan */}
+              {/* Animated drift path */}
               <Polyline
-                positions={backwardDrift}
-                pathOptions={{ color: '#00F0FF', weight: 2, dashArray: '6 4' }}
+                positions={activeTrail}
+                pathOptions={{ color: '#00F0FF', weight: 3, opacity: 0.8 }}
               />
 
-              {/* Forward drift — dashed amber */}
-              <Polyline
-                positions={forwardDrift}
-                pathOptions={{ color: '#FBBF24', weight: 2, dashArray: '6 4' }}
-              />
-
-              {/* Spill center */}
+              {/* Current Playback Marker */}
               <CircleMarker
-                center={[selectedSpill.lat, selectedSpill.lng]}
+                center={currentPos}
                 radius={6}
-                pathOptions={{ color: spillColor, fillColor: spillColor, fillOpacity: 0.4, weight: 2 }}
-              />
+                pathOptions={{ color: spillColor, fillColor: spillColor, fillOpacity: 1, weight: 2 }}
+              >
+                <Tooltip permanent direction="top" className="font-mono text-[10px] bg-transparent border-0 shadow-none text-white font-bold">
+                  T{currentHour > 0 ? '+' : ''}{currentHour.toFixed(1)}h
+                </Tooltip>
+              </CircleMarker>
 
               {/* Origin point (with Uncertainty Cone) */}
               <Circle
@@ -467,6 +521,74 @@ export default function InvestigationsDesk() {
                 </CircleMarker>
               ))}
             </MapContainer>
+
+            {/* Scrubber Controls */}
+            {allPoints.length > 0 && (
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[600px] z-[1000] bg-[#0b1320]/90 border border-slate-800 p-4 shadow-2xl backdrop-blur-md rounded-lg">
+                
+                <div className="flex justify-between items-end mb-2">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setIsPlaying(!isPlaying)}
+                      className="w-10 h-10 rounded-full bg-[#00f0ff]/10 border border-[#00f0ff] text-[#00f0ff] flex items-center justify-center hover:bg-[#00f0ff] hover:text-black transition-colors"
+                    >
+                      {isPlaying ? <Pause size={18} /> : <Play size={18} fill="currentColor" />}
+                    </button>
+                    
+                    <div className="flex gap-1 bg-[#0a0f18] p-1 rounded border border-slate-800">
+                      {[1, 2, 5].map(s => (
+                        <button 
+                          key={s}
+                          onClick={() => setPlaySpeed(s)}
+                          className={`px-2 py-0.5 text-[10px] font-mono rounded ${playSpeed === s ? 'bg-[#00f0ff] text-black font-bold' : 'text-slate-400 hover:text-white'}`}
+                        >
+                          {s}x
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-1">
+                      Environmental Forcing
+                    </div>
+                    <div className="flex gap-4 text-xs font-mono">
+                      <span className="text-amber-400">CURRENT: {driftData?.current_speed_knots?.toFixed(1) || '?'}kts @ {driftData?.current_dir_deg?.toFixed(0) || '?'}°</span>
+                      <span className="text-sky-400">WIND: {driftData?.wind_speed_knots?.toFixed(1) || '?'}kts @ {driftData?.wind_dir_deg?.toFixed(0) || '?'}°</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-center gap-4">
+                  <span className="text-[10px] font-mono text-slate-400 whitespace-nowrap">
+                    {minHour.toFixed(0)}h
+                  </span>
+                  
+                  <div className="relative flex-1">
+                    <input
+                      type="range"
+                      min={minHour}
+                      max={maxHour}
+                      step={0.5}
+                      value={currentHour}
+                      onChange={(e) => {
+                        setCurrentHour(parseFloat(e.target.value));
+                        setIsPlaying(false);
+                      }}
+                      className="w-full h-1 bg-slate-800 rounded-full appearance-none cursor-pointer accent-[#00f0ff]"
+                    />
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 text-[9px] font-mono text-slate-500">
+                      DETECTION (T=0)
+                    </div>
+                    <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-1 h-3 bg-slate-600/30" />
+                  </div>
+
+                  <span className="text-[10px] font-mono text-slate-400 whitespace-nowrap">
+                    +{maxHour.toFixed(0)}h
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Suspect Attribution Panel */}
