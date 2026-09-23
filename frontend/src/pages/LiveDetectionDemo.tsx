@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Upload, Radar, AlertTriangle, CheckCircle, XCircle, Loader2, Info } from 'lucide-react';
+import { Upload, Radar, AlertTriangle, CheckCircle, XCircle, Loader2, Info, Target } from 'lucide-react';
 
 const BACKEND_URL = 'http://localhost:8000';
 
@@ -39,6 +39,7 @@ export default function LiveDetectionDemo() {
   const [result, setResult] = useState<DetectionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [backendStatus, setBackendStatus] = useState<'unknown' | 'online' | 'offline'>('unknown');
+  const [attributionState, setAttributionState] = useState<'idle' | 'running'>('idle');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Check backend health on mount
@@ -53,6 +54,7 @@ export default function LiveDetectionDemo() {
     setLoading(true);
     setResult(null);
     setError(null);
+    setAttributionState('idle');
 
     const formData = new FormData();
     formData.append('image', imageBlob, 'input.jpg');
@@ -318,10 +320,168 @@ export default function LiveDetectionDemo() {
                   </div>
                 </div>
               </div>
+
+              {/* AI ATTRIBUTION ENGINE (Only if spill detected) */}
+              {result.spill_detected && (
+                <div className="mt-8 border-t border-ocean-border pt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p className="font-mono text-[9px] text-ocean-cyan tracking-widest mb-1">ADVANCED ANALYSIS</p>
+                      <h3 className="font-sans font-bold text-ocean-text text-lg">AI Spill Hindcasting & Attribution</h3>
+                    </div>
+                    {attributionState === 'idle' && (
+                      <button 
+                        onClick={() => setAttributionState('running')}
+                        className="tactical-button bg-ocean-cyan/10 border border-ocean-cyan/50 text-ocean-cyan hover:bg-ocean-cyan hover:text-black px-4 py-2 font-mono text-xs flex items-center gap-2 transition-colors"
+                      >
+                        <Target size={14} />
+                        INITIALIZE ATTRIBUTION
+                      </button>
+                    )}
+                  </div>
+
+                  {attributionState !== 'idle' && (
+                    <AIAttributionSequence />
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// Dedicated internal component for the slick animation sequence
+function AIAttributionSequence() {
+  const [step, setStep] = useState(0);
+
+  useEffect(() => {
+    // Step 0: Grid/Slick scanning
+    // Step 1: Draw backward trajectory (after 1s)
+    // Step 2: Show suspect ship (after 3.5s)
+    const t1 = setTimeout(() => setStep(1), 1000);
+    const t2 = setTimeout(() => setStep(2), 3500);
+    return () => { clearTimeout(t1); clearTimeout(t2); }
+  }, []);
+
+  return (
+    <div className="relative w-full aspect-[21/9] bg-[#050a10] border border-ocean-border rounded overflow-hidden flex items-center justify-center shadow-[inset_0_0_40px_rgba(0,0,0,0.8)] mt-4">
+      <style>
+        {`
+          @keyframes drawLine {
+            from { stroke-dashoffset: 1000; }
+            to { stroke-dashoffset: 0; }
+          }
+          .path-draw {
+            stroke-dasharray: 10;
+            stroke-dashoffset: 1000;
+            animation: drawLine 2.5s ease-in-out forwards;
+          }
+          @keyframes slideInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          .animate-slide-up {
+            animation: slideInUp 0.5s ease-out forwards;
+          }
+          @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+          }
+          .animate-slide-right {
+            animation: slideInRight 0.5s ease-out forwards;
+          }
+        `}
+      </style>
+      
+      {/* Grid Background */}
+      <div 
+        className="absolute inset-0 opacity-10" 
+        style={{ 
+          backgroundImage: 'linear-gradient(rgba(34, 211, 238, 0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(34, 211, 238, 0.5) 1px, transparent 1px)', 
+          backgroundSize: '20px 20px',
+          backgroundPosition: 'center'
+        }}
+      />
+      
+      {/* Simulated Map / Trajectory SVG */}
+      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 1000 400" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <linearGradient id="lineGrad" x1="100%" y1="100%" x2="0%" y2="0%">
+            <stop offset="0%" stopColor="#ff2a5f" stopOpacity="0.2" />
+            <stop offset="100%" stopColor="#f59e0b" stopOpacity="1" />
+          </linearGradient>
+        </defs>
+        
+        {/* The Spill Origin (Current location - Bottom Right) */}
+        <circle cx="850" cy="300" r="50" fill="rgba(255,42,95,0.1)" stroke="#ff2a5f" strokeWidth="1" strokeDasharray="4 4" className="animate-[spin_10s_linear_infinite]" />
+        <circle cx="850" cy="300" r="4" fill="#ff2a5f" />
+        <text x="850" y="370" fill="#ff2a5f" fontSize="10" textAnchor="middle" className="font-mono">CURRENT SPILL</text>
+        <text x="850" y="385" fill="#ef4444" fontSize="8" textAnchor="middle" className="font-mono opacity-70">T=0</text>
+        
+        {/* Backward Trajectory Line */}
+        {step >= 1 && (
+          <path 
+            d="M 850 300 C 650 350, 400 150, 200 100" 
+            fill="none" 
+            stroke="url(#lineGrad)" 
+            strokeWidth="3" 
+            className="path-draw"
+          />
+        )}
+        
+        {/* The Origin / Suspect Vessel (Top Left) */}
+        {step >= 2 && (
+          <g className="animate-slide-up">
+            <circle cx="200" cy="100" r="25" fill="rgba(245,158,11,0.2)" stroke="#f59e0b" strokeWidth="1.5" className="animate-ping" />
+            <circle cx="200" cy="100" r="6" fill="#f59e0b" />
+            <text x="200" y="145" fill="#f59e0b" fontSize="10" fontWeight="bold" textAnchor="middle" className="font-mono">ORIGIN DETECTED</text>
+            <text x="200" y="160" fill="#f59e0b" fontSize="8" textAnchor="middle" className="font-mono opacity-70">T-48 HOURS</text>
+            
+            {/* Connecting line to the card */}
+            <path d="M 200 70 L 200 40 L 250 40" fill="none" stroke="#f59e0b" strokeWidth="1" opacity="0.5" />
+          </g>
+        )}
+      </svg>
+      
+      {/* Scanning Overlay (Phase 0) */}
+      {step === 0 && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px]">
+          <Loader2 size={32} className="text-ocean-cyan animate-spin mb-3" />
+          <p className="font-mono text-[10px] text-ocean-cyan tracking-[0.2em] animate-pulse">CALCULATING HINDCAST PHYSICS...</p>
+        </div>
+      )}
+      
+      {/* Culprit Card (Phase 2) */}
+      {step >= 2 && (
+        <div className="absolute top-4 left-[250px] bg-black/80 border border-ocean-amber/50 p-4 rounded backdrop-blur-md animate-slide-right min-w-[300px] shadow-[0_0_30px_rgba(245,158,11,0.15)]">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-ocean-amber/10 rounded">
+              <Target className="text-ocean-amber" size={24} />
+            </div>
+            <div className="w-full">
+              <h3 className="font-sans font-bold text-ocean-amber">M/V OCEANIC CHALLENGER</h3>
+              <p className="font-mono text-[10px] text-ocean-text-muted mt-1">MMSI: 413200987 | FLAG: PANAMA</p>
+              
+              <div className="mt-4 mb-2">
+                <div className="flex justify-between text-[10px] font-mono mb-1.5">
+                  <span className="text-ocean-text-dim">AIS & SAR ATTRIBUTION MATCH</span>
+                  <span className="text-ocean-amber font-bold">96.8%</span>
+                </div>
+                <div className="w-full h-1.5 bg-black rounded overflow-hidden border border-ocean-border">
+                  <div className="h-full bg-ocean-amber w-[96.8%]" />
+                </div>
+              </div>
+              
+              <p className="font-mono text-[9px] text-ocean-text-dim mt-3 leading-relaxed">
+                Reverse trajectory intersects with historical AIS coordinates at T-48H. Speed anomalies detected matching illegal bilge dumping profile.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
