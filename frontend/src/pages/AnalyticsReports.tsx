@@ -39,6 +39,23 @@ function ChartPanel({
 }
 
 export default function AnalyticsReports() {
+  const handleExport = () => {
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + "Metric,Value,Change\n"
+      + "Total Spills (7D),31,+14.8%\n"
+      + "Critical (7D),10,+25.0%\n"
+      + "Suspects Flagged,14,8 tankers / 6 other\n"
+      + "False Positives,3,-40.0%";
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "ocean_guard_report_7d.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="p-6 space-y-4">
       {/* Header */}
@@ -49,7 +66,10 @@ export default function AnalyticsReports() {
             [ DETECTION TRENDS — VESSEL ATTRIBUTION — ALERT DISTRIBUTION ] — 7-DAY WINDOW
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 border border-ocean-cyan/40 bg-ocean-cyan/5 text-ocean-cyan hover:bg-ocean-cyan/10 transition-colors">
+        <button 
+          onClick={handleExport}
+          className="flex items-center gap-2 px-4 py-2 border border-ocean-cyan/40 bg-ocean-cyan/5 text-ocean-cyan hover:bg-ocean-cyan/10 transition-colors"
+        >
           <Download size={14} strokeWidth={1.5} />
           <span className="font-sans text-xs font-medium">Export Report</span>
         </button>

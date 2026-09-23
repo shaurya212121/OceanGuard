@@ -75,8 +75,8 @@ def generate_guilty_vessel_near(
     speed_pre = random.uniform(11, 14)
     speed_post = random.uniform(13, 16)
 
-    # Build 96 position reports across 48 hours, every 30 min
-    for j in range(96):
+    # Build 240 position reports across 120 hours, every 30 min
+    for j in range(240):
         dt = base_time - timedelta(hours=48) + timedelta(minutes=j * 30)
         time_diff_hours = (dt - spill_time).total_seconds() / 3600.0
 

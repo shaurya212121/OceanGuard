@@ -50,19 +50,7 @@ function AnimatedVessel({ vessel, currentHour, baseTimeMs }: { vessel: Vessel, c
     
     if (currentHour <= minHour) return [allPoints[0].lat, allPoints[0].lon] as [number, number];
     
-    // DEAD RECKONING: Project vessel into the future based on its last known trajectory!
-    if (currentHour >= maxHour) {
-      const lastPt = allPoints[allPoints.length - 1];
-      const timeDiffHours = currentHour - maxHour;
-      const speedKmh = (lastPt.sog || vessel.sog) * 1.852;
-      const heading = lastPt.cog || vessel.cog;
-      
-      // Simple flat-earth approximation for tiny distances
-      const dLat = (speedKmh * Math.cos(heading * Math.PI / 180)) / 111.0 * timeDiffHours;
-      const dLon = (speedKmh * Math.sin(heading * Math.PI / 180)) / (111.0 * Math.cos(lastPt.lat * Math.PI / 180)) * timeDiffHours;
-      
-      return [lastPt.lat + dLat, lastPt.lon + dLon] as [number, number];
-    }
+    if (currentHour >= maxHour) return [allPoints[allPoints.length - 1].lat, allPoints[allPoints.length - 1].lon] as [number, number];
     
     for (let i = 0; i < allPoints.length - 1; i++) {
       if (allPoints[i].hours_offset <= currentHour && allPoints[i+1].hours_offset >= currentHour) {

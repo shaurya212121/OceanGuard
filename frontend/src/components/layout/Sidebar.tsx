@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Radar, Search, Ship, BarChart3, Settings, ShieldCheck, ChevronRight, Upload } from 'lucide-react';
 
 const navItems = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, code: 'DASH' },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, code: 'DASH' },
   { to: '/map', label: 'Live Tactical Map', icon: Radar, code: 'MAP' },
   { to: '/investigations', label: 'Investigations Desk', icon: Search, code: 'INV' },
   { to: '/vessels', label: 'Vessels Registry', icon: Ship, code: 'VES' },
@@ -35,7 +35,7 @@ export default function Sidebar() {
           <NavLink
             key={item.to}
             to={item.to}
-            end={item.to === '/'}
+            end={item.to === '/dashboard'}
             className={({ isActive }) =>
               `group flex items-center gap-3 px-3 py-2.5 border transition-all duration-150 ${
                 isActive

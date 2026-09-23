@@ -17,7 +17,7 @@ supabase: Client = create_client(url, key)
 base_time = datetime.now(timezone.utc)
 
 print("Generating 250 background vessels...")
-vessels = generate_vessels(base_time, count=250)
+vessels = generate_vessels(base_time, count=150)
 
 print("Pushing vessels to Supabase...")
 for i, v in enumerate(vessels):

@@ -6,13 +6,15 @@ import InvestigationsDesk from '@/pages/InvestigationsDesk';
 import VesselsRegistry from '@/pages/VesselsRegistry';
 import AnalyticsReports from '@/pages/AnalyticsReports';
 import LiveDetectionDemo from '@/pages/LiveDetectionDemo';
+import StartingPage from '@/pages/StartingPage';
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<StartingPage />} />
         <Route element={<Layout />}>
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/map" element={<LiveTacticalMap />} />
           <Route path="/investigations" element={<InvestigationsDesk />} />
           <Route path="/vessels" element={<VesselsRegistry />} />

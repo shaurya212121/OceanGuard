@@ -57,8 +57,8 @@ def generate_vessels(base_time: datetime, count: int = 15) -> List[VesselTrack]:
         current_lat = start_lat
         current_lon = start_lon
         
-        # 48 hours, every 30 mins -> 96 points
-        for j in range(96):
+        # 120 hours, every 30 mins -> 240 points (covers full -48h to +72h scrubber)
+        for j in range(240):
             dt = base_time - timedelta(hours=48) + timedelta(minutes=j*30)
             
             # Simple linear movement
@@ -71,8 +71,21 @@ def generate_vessels(base_time: datetime, count: int = 15) -> List[VesselTrack]:
             
             # Land collision check
             if globe.is_land(next_lat, next_lon):
-                # Stop advancing (drop anchor)
-                speed = 0.0
+                # Hit land! Bounce off (turn around 135 to 225 degrees)
+                heading = (heading + random.uniform(135, 225)) % 360
+                
+                # Recalculate bounce vector
+                d_lat = (speed_kmh * math.cos(math.radians(heading))) / 111.0 * 0.5
+                d_lon = (speed_kmh * math.sin(math.radians(heading))) / (111.0 * math.cos(math.radians(current_lat))) * 0.5
+                next_lat = current_lat + d_lat
+                next_lon = current_lon + d_lon
+                
+                # If STILL on land (stuck in a bay), just stop
+                if globe.is_land(next_lat, next_lon):
+                    speed = 0.0
+                else:
+                    current_lat = next_lat
+                    current_lon = next_lon
             else:
                 current_lat = next_lat
                 current_lon = next_lon
@@ -117,7 +130,7 @@ def generate_guilty_vessel(base_time: datetime, origin_lat: float, origin_lon: f
     heading_post = 225 # SW
     speed_post = 14.0
     
-    for j in range(96):
+    for j in range(240):
         dt = base_time - timedelta(hours=48) + timedelta(minutes=j*30)
         
         time_diff_hours = (dt - spill_time).total_seconds() / 3600.0
@@ -129,9 +142,14 @@ def generate_guilty_vessel(base_time: datetime, origin_lat: float, origin_lon: f
             lat_offset = (dist * math.cos(math.radians(heading_pre+180))) / 111.0
             lon_offset = (dist * math.sin(math.radians(heading_pre+180))) / (111.0 * math.cos(math.radians(origin_lat)))
             
+            nl = origin_lat + lat_offset
+            nlo = origin_lon + lon_offset
+            if globe.is_land(nl, nlo):
+                nl, nlo = origin_lat, origin_lon
+            
             vessel.positions.append(VesselPosition(
-                lat=origin_lat + lat_offset,
-                lon=origin_lon + lon_offset,
+                lat=nl,
+                lon=nlo,
                 timestamp=dt,
                 speed_knots=speed_pre,
                 heading=heading_pre
@@ -152,9 +170,14 @@ def generate_guilty_vessel(base_time: datetime, origin_lat: float, origin_lon: f
             lat_offset = (dist * math.cos(math.radians(heading_post))) / 111.0
             lon_offset = (dist * math.sin(math.radians(heading_post))) / (111.0 * math.cos(math.radians(origin_lat)))
             
+            nl = origin_lat + lat_offset
+            nlo = origin_lon + lon_offset
+            if globe.is_land(nl, nlo):
+                nl, nlo = origin_lat, origin_lon
+            
             vessel.positions.append(VesselPosition(
-                lat=origin_lat + lat_offset,
-                lon=origin_lon + lon_offset,
+                lat=nl,
+                lon=nlo,
                 timestamp=dt,
                 speed_knots=speed_post,
                 heading=heading_post
