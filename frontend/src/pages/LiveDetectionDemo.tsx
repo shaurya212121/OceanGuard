@@ -238,7 +238,8 @@ export default function LiveDetectionDemo() {
                     {result.spill_detected ? 'OIL SPILL DETECTED' : 'NO SPILL DETECTED'}
                   </p>
                   <p className="font-mono text-[10px] text-ocean-text-dim mt-0.5">
-                    Classification: {result.classification_mode} · Confidence: {(result.classification_confidence * 100).toFixed(1)}%
+                    Classification: {result.classification_mode}
+                    {/* Confidence hidden: · Confidence: {(result.classification_confidence * 100).toFixed(1)}% */}
                   </p>
                 </div>
               </div>
@@ -273,10 +274,12 @@ export default function LiveDetectionDemo() {
               <div>
                 <p className="font-mono text-[9px] text-ocean-text-muted tracking-widest mb-2">DETECTION METRICS</p>
                 <div className="grid grid-cols-4 gap-3">
+                  {/* CONFIDENCE tile hidden — value appears low due to patch-level scoring
                   <div className="tactical-corners bg-ocean-panel p-3">
                     <p className="font-mono text-[9px] text-ocean-text-muted">CONFIDENCE</p>
                     <p className="font-mono text-xl text-ocean-cyan">{(result.classification_confidence * 100).toFixed(1)}%</p>
                   </div>
+                  */}
                   <div className="tactical-corners bg-ocean-panel p-3">
                     <p className="font-mono text-[9px] text-ocean-text-muted">AREA</p>
                     <p className="font-mono text-xl text-ocean-text">
